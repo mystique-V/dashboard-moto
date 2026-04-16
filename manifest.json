@@ -36,9 +36,9 @@
       "label": "Tableau de bord de l'école moto"
     },
     {
-      "src": "screenshot-mobile.png",
+      "src": "screenshot-mobile.jpg",
       "sizes": "390x844",
-      "type": "image/png",
+      "type": "image/jpg",
       "form_factor": "narrow",
       "label": "Vue mobile du dashboard"
     }
