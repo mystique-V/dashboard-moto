@@ -5,9 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <link rel="manifest" href="manifest.json"/>
 <meta name="theme-color" content="#f97316"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
 <script>
-  if('serviceWorker' in navigator)
-    navigator.serviceWorker.register('/sw.js');
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js')
+        .then(() => console.log('SW enregistré'))
+        .catch(e => console.log('SW erreur', e));
+    });
+  }
 </script>
 <title>École de Conduite Bois d'O</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
