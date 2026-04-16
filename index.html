@@ -1,0 +1,1287 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<link rel="manifest" href="manifest.json"/>
+<meta name="theme-color" content="#f97316"/>
+<script>
+  if('serviceWorker' in navigator)
+    navigator.serviceWorker.register('/sw.js');
+</script>
+<title>École de Conduite Bois d'O</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{--bg:#0f1117;--surface:#1a1d2e;--card:#222639;--accent:#f97316;--accent2:#6366f1;--text:#f1f5f9;--muted:#94a3b8;--border:#2e3248;--success:#10b981;--warning:#f59e0b;--danger:#f43f5e;}
+body.light{--bg:#f0f2f5;--surface:#f8f9fb;--card:#ffffff;--accent:#c2600a;--accent2:#4f52b8;--text:#2d3748;--muted:#718096;--border:#dde1e9;--success:#276749;--warning:#b7791f;--danger:#c0392b;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;transition:background .2s,color .2s;}
+.shell{display:flex;height:100vh;overflow:hidden;}
+.sidebar{width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:20px 0;flex-shrink:0;transition:transform .2s;z-index:50;}
+.main{flex:1;overflow-y:auto;display:flex;flex-direction:column;min-width:0;}
+.logo{display:flex;align-items:center;gap:10px;padding:0 20px 24px;font-size:.92rem;font-weight:700;color:var(--accent);line-height:1.3;}
+.logo-icon{font-size:1.5rem;flex-shrink:0;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:11px 20px;cursor:pointer;color:var(--muted);font-size:.88rem;border-left:3px solid transparent;transition:all .2s;}
+.nav-item:hover,.nav-item.active{background:rgba(249,115,22,.08);color:var(--text);border-left-color:var(--accent);}
+.nav-item .icon{font-size:1.1rem;width:22px;text-align:center;}
+.sidebar-footer{margin-top:auto;padding:14px 20px;font-size:.72rem;color:var(--muted);border-top:1px solid var(--border);}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:11px 20px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;gap:10px;}
+.topbar h1{font-size:.98rem;font-weight:600;white-space:nowrap;}
+.topbar-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.btn{padding:7px 13px;border-radius:8px;border:none;cursor:pointer;font-size:.8rem;font-weight:600;transition:opacity .2s;}
+.btn:hover{opacity:.85;}
+.btn-primary{background:var(--accent);color:#fff;}
+.btn-ghost{background:var(--border);color:var(--text);}
+.btn-danger{background:rgba(244,63,94,.15);color:var(--danger);}
+.btn-success{background:rgba(16,185,129,.15);color:var(--success);}
+.btn-sm{padding:4px 9px;font-size:.71rem;}
+.theme-toggle{background:var(--border);border:none;border-radius:8px;padding:7px 10px;cursor:pointer;font-size:1rem;color:var(--text);}
+.content{padding:20px;flex:1;}
+.page{display:none;}.page.active{display:block;}
+/* KPI */
+.kpi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px;}
+.kpi-card{background:var(--card);border-radius:12px;padding:18px;border:1px solid var(--border);display:flex;flex-direction:column;gap:6px;}
+.kpi-label{font-size:.71rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;}
+.kpi-value{font-size:1.8rem;font-weight:700;}
+.kpi-sub{font-size:.73rem;color:var(--muted);}
+.kpi-icon{font-size:1.4rem;margin-bottom:2px;}
+/* LAYOUT */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;}
+.card{background:var(--card);border-radius:12px;padding:18px;border:1px solid var(--border);}
+.card-title{font-size:.86rem;font-weight:600;margin-bottom:14px;color:var(--muted);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;}
+.card-title span{color:var(--text);}
+/* TABLES */
+.table-wrap{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:.81rem;}
+th{text-align:left;padding:9px 10px;color:var(--muted);font-weight:600;font-size:.71rem;text-transform:uppercase;border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none;}
+th:hover{color:var(--text);}
+th .sort-icon{font-size:.64rem;margin-left:3px;opacity:.5;}
+th.sorted .sort-icon{opacity:1;color:var(--accent);}
+td{padding:10px;border-bottom:1px solid rgba(128,128,128,.08);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:rgba(128,128,128,.04);}
+.avatar{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.73rem;flex-shrink:0;}
+.student-name{display:flex;align-items:center;gap:8px;}
+/* TAGS */
+.tag{padding:3px 8px;border-radius:99px;font-size:.7rem;font-weight:600;}
+.tag-green{background:rgba(16,185,129,.15);color:var(--success);}
+.tag-orange{background:rgba(249,115,22,.15);color:var(--accent);}
+.tag-blue{background:rgba(99,102,241,.15);color:var(--accent2);}
+.tag-red{background:rgba(244,63,94,.15);color:var(--danger);}
+.ready-badge{background:rgba(16,185,129,.2);color:var(--success);border:1px solid rgba(16,185,129,.4);padding:3px 8px;border-radius:99px;font-size:.7rem;font-weight:700;}
+/* SKILLS */
+.skill-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;font-size:.8rem;}
+.skill-name{width:115px;color:var(--muted);flex-shrink:0;}
+.skill-badge{padding:4px 11px;border-radius:99px;font-size:.73rem;font-weight:700;letter-spacing:.02em;white-space:nowrap;}
+.skill-badge.debutant{background:rgba(244,63,94,.15);color:var(--danger);}
+.skill-badge.progression{background:rgba(245,158,11,.15);color:var(--warning);}
+.skill-badge.acquis{background:rgba(99,102,241,.15);color:var(--accent2);}
+.skill-badge.maitrise{background:rgba(16,185,129,.15);color:var(--success);}
+.skill-select{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:4px 8px;color:var(--text);font-size:.78rem;outline:none;cursor:pointer;flex:1;}
+.skill-select:focus{border-color:var(--accent);}
+.skill-check{display:flex;align-items:center;gap:6px;font-size:.8rem;cursor:pointer;}
+.skill-check input{width:15px;height:15px;cursor:pointer;accent-color:var(--accent);}
+/* CALENDAR */
+.cal-view-tabs{display:flex;gap:6px;margin-bottom:14px;}
+.cal-tab{padding:5px 12px;border-radius:6px;font-size:.78rem;font-weight:600;cursor:pointer;background:var(--border);color:var(--muted);border:none;}
+.cal-tab.active{background:var(--accent);color:#fff;}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;}
+.cal-header{font-size:.66rem;color:var(--muted);text-align:center;padding:4px 0;}
+.cal-day{aspect-ratio:1;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:.73rem;cursor:pointer;transition:background .15s;position:relative;}
+.cal-day:hover{background:rgba(128,128,128,.1);}
+.cal-day.today{background:var(--accent);color:#fff;font-weight:700;}
+.cal-day.has-event::after{content:'';position:absolute;bottom:2px;width:4px;height:4px;border-radius:50%;background:var(--accent2);}
+.cal-day.empty{opacity:0;pointer-events:none;}
+.cal-day.selected{outline:2px solid var(--accent2);}
+.cal-month-nav{font-size:.86rem;font-weight:600;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;}
+.cal-nav{background:none;border:none;color:var(--muted);cursor:pointer;font-size:1rem;padding:3px 7px;}
+/* WEEK VIEW */
+.week-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;}
+.week-day-col{background:var(--surface);border-radius:8px;padding:8px;border:1px solid var(--border);min-height:100px;}
+.week-day-header{font-size:.72rem;font-weight:700;color:var(--muted);text-align:center;margin-bottom:6px;padding-bottom:5px;border-bottom:1px solid var(--border);}
+.week-day-header.today-col{color:var(--accent);}
+.week-event{background:rgba(249,115,22,.12);border-left:3px solid var(--accent);border-radius:4px;padding:4px 6px;margin-bottom:4px;font-size:.71rem;cursor:pointer;}
+.week-event:hover{background:rgba(249,115,22,.2);}
+.week-event .we-time{color:var(--muted);font-size:.67rem;}
+.week-event .we-name{font-weight:600;color:var(--text);}
+/* EVENTS */
+.event-item{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid rgba(128,128,128,.08);align-items:flex-start;}
+.event-item:last-child{border-bottom:none;}
+.event-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;margin-top:5px;}
+.event-time{font-size:.72rem;color:var(--muted);}
+.event-title{font-size:.81rem;font-weight:500;}
+.event-item.clickable{cursor:pointer;border-radius:8px;padding:9px 8px;margin:0 -8px;}
+.event-item.clickable:hover{background:rgba(249,115,22,.06);}
+/* NOTES */
+.note-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px;transition:border-color .2s;}
+.note-card:hover{border-color:var(--accent2);}
+.note-date{font-size:.7rem;color:var(--muted);margin-bottom:3px;}
+/* MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:200;align-items:center;justify-content:center;padding:16px;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--card);border-radius:14px;padding:24px;width:540px;max-width:100%;border:1px solid var(--border);max-height:90vh;overflow-y:auto;}
+.modal h2{font-size:1.03rem;margin-bottom:18px;}
+.form-group{margin-bottom:14px;}
+.form-group label{font-size:.78rem;color:var(--muted);display:block;margin-bottom:5px;}
+.form-group label.required::after{content:' *';color:var(--danger);}
+.form-group input,.form-group select,.form-group textarea{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 11px;color:var(--text);font-size:.84rem;outline:none;transition:border-color .2s;}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--accent);}
+.form-group input.error,.form-group select.error{border-color:var(--danger)!important;}
+.field-error{font-size:.72rem;color:var(--danger);margin-top:3px;display:none;}
+.field-error.show{display:block;}
+.form-group textarea{resize:vertical;min-height:62px;}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.modal-footer{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;}
+.section-label{font-size:.74rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin:14px 0 8px;padding-bottom:5px;border-bottom:1px solid var(--border);}
+.step{display:none;}.step.active{display:block;}
+.step-indicator{display:flex;gap:6px;margin-bottom:18px;}
+.step-dot{width:8px;height:8px;border-radius:50%;background:var(--border);}
+.step-dot.active{background:var(--accent);}
+/* DETAIL */
+.detail-header{display:flex;align-items:center;gap:16px;margin-bottom:20px;flex-wrap:wrap;}
+.detail-avatar{width:54px;height:54px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.3rem;font-weight:700;flex-shrink:0;}
+.detail-info h2{font-size:1.08rem;}
+.detail-info p{color:var(--muted);font-size:.81rem;margin-top:3px;}
+.back-btn{background:none;border:none;color:var(--accent);cursor:pointer;font-size:.83rem;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:5px;padding:0;}
+.stat-pill{background:var(--surface);border-radius:8px;padding:11px 13px;display:flex;align-items:center;gap:10px;border:1px solid var(--border);}
+.sp-icon{font-size:1.2rem;}.sp-val{font-size:1.03rem;font-weight:700;}.sp-lbl{font-size:.71rem;color:var(--muted);}
+.two-stat{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;}
+.hist-item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(128,128,128,.08);font-size:.8rem;}
+.hist-item:last-child{border-bottom:none;}
+.hist-type{flex:1;color:var(--text);}
+.hist-date{color:var(--muted);font-size:.74rem;white-space:nowrap;}
+.hist-dur{color:var(--accent);font-weight:600;white-space:nowrap;}
+/* SEARCH */
+.search-bar{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:7px 11px;color:var(--text);font-size:.82rem;outline:none;}
+.search-bar:focus{border-color:var(--accent);}
+/* CHARTS */
+.chart-wrap{position:relative;height:185px;}
+.chart-wrap-lg{position:relative;height:220px;}
+/* TOAST */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--success);color:#fff;padding:12px 20px;border-radius:10px;font-size:.84rem;font-weight:600;z-index:999;transform:translateY(80px);opacity:0;transition:all .3s;pointer-events:none;max-width:300px;}
+.toast.show{transform:translateY(0);opacity:1;}
+.toast.error{background:var(--danger);}
+.toast.warn{background:var(--warning);color:#1e293b;}
+/* ALERTS */
+.ready-alert{background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.3);border-radius:10px;padding:12px 16px;margin-bottom:10px;display:flex;align-items:center;gap:10px;font-size:.82rem;flex-wrap:wrap;}
+.storage-alert{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.4);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:.82rem;display:none;}
+/* MONITEUR badge */
+.moniteur-badge{background:rgba(99,102,241,.15);color:var(--accent2);padding:2px 8px;border-radius:99px;font-size:.68rem;font-weight:700;}
+/* HAMBURGER */
+.hamburger{display:none;background:none;border:none;font-size:1.3rem;cursor:pointer;color:var(--text);padding:4px;}
+.sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:40;}
+@media(max-width:768px){
+  .sidebar{position:fixed;top:0;left:0;height:100%;transform:translateX(-100%);width:240px;}
+  .sidebar.open{transform:translateX(0);}
+  .sidebar-overlay.open{display:block;}
+  .hamburger{display:block;}
+  .kpi-grid{grid-template-columns:1fr 1fr;}
+  .two-col{grid-template-columns:1fr;}
+  .form-row{grid-template-columns:1fr;}
+  .content{padding:14px;}
+  .week-grid{grid-template-columns:repeat(3,1fr);}
+}
+@media(max-width:480px){
+  .kpi-grid{grid-template-columns:1fr;}
+  .topbar-right .search-bar{display:none;}
+  .week-grid{grid-template-columns:1fr 1fr;}
+}
+</style>
+</head>
+<body>
+<div class="toast" id="toast"></div>
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+<div class="shell">
+  <aside class="sidebar" id="sidebar">
+    <div class="logo"><span class="logo-icon">🏍️</span><span>École de Conduite<br>Bois d'O</span></div>
+    <nav>
+      <div class="nav-item active" onclick="showPage('dashboard',this)"><span class="icon">📊</span><span>Tableau de bord</span></div>
+      <div class="nav-item" onclick="showPage('students',this)"><span class="icon">👥</span><span>Élèves</span></div>
+      <div class="nav-item" onclick="showPage('calendar',this)"><span class="icon">📅</span><span>Agenda</span></div>
+      <div class="nav-item" onclick="showPage('suivis',this)"><span class="icon">📋</span><span>Suivi de séance</span></div>
+      <div class="nav-item" onclick="showPage('stats',this)"><span class="icon">📈</span><span>Statistiques</span></div>
+    </nav>
+    <div class="sidebar-footer" style="display:flex;flex-direction:column;gap:8px;">
+      <div id="moniteur-label" style="font-weight:600;color:var(--accent);font-size:.78rem;">👤 <span id="current-moniteur-name">—</span></div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap;">
+        <button class="btn btn-ghost btn-sm" onclick="openModal('export-data')" title="Exporter les données">📤 Export</button>
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('import-file').click()" title="Importer des données">📥 Import</button>
+      </div>
+      <input type="file" id="import-file" accept=".json" style="display:none;" onchange="importData(event)"/>
+      <div style="font-size:.68rem;color:var(--muted);" id="storage-info"></div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <button class="hamburger" onclick="toggleSidebar()">☰</button>
+        <h1 id="page-title">Tableau de bord</h1>
+      </div>
+      <div class="topbar-right">
+        <input class="search-bar" placeholder="🔍 Rechercher…" id="global-search" oninput="globalSearch(this.value)" style="width:165px;"/>
+        <button class="theme-toggle" onclick="toggleTheme()" id="theme-btn" title="Thème">🌙</button>
+        <button class="btn btn-primary" onclick="openModal('add-student')">+ Nouvel Élève</button>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- ===== DASHBOARD ===== -->
+      <div class="page active" id="page-dashboard">
+        <div id="storage-alert-banner" class="storage-alert">
+          ⚠️ <strong>Attention :</strong> votre stockage local est presque plein (<span id="storage-pct"></span>%). Pensez à exporter vos données via le bouton <strong>📤 Export</strong> dans la barre latérale.
+        </div>
+        <div class="kpi-grid">
+          <div class="kpi-card"><div class="kpi-icon">👥</div><div class="kpi-label">Élèves actifs</div><div class="kpi-value" id="kpi-total">—</div><div class="kpi-sub">inscrits</div></div>
+          <div class="kpi-card"><div class="kpi-icon">✅</div><div class="kpi-label">Examens réussis</div><div class="kpi-value" style="color:var(--success)" id="kpi-passed">—</div><div class="kpi-sub">Taux : <span id="kpi-rate">—</span></div></div>
+          <div class="kpi-card"><div class="kpi-icon">🎯</div><div class="kpi-label">Prêts pour l'examen</div><div class="kpi-value" style="color:var(--accent2)" id="kpi-ready">—</div><div class="kpi-sub">toutes compétences ok</div></div>
+        </div>
+        <div id="ready-alerts"></div>
+        <div class="two-col">
+          <div class="card"><div class="card-title"><span>Cours aujourd'hui</span><span class="tag tag-blue" id="today-count">0</span></div><div id="today-events"></div></div>
+          <div class="card"><div class="card-title"><span>Progression par compétence</span></div><div id="skills-overview"></div></div>
+        </div>
+        <div class="two-col">
+          <div class="card"><div class="card-title"><span>Statuts examens</span></div><div class="chart-wrap"><canvas id="examChart"></canvas></div></div>
+          <div class="card"><div class="card-title"><span>Séances / mois</span></div><div class="chart-wrap"><canvas id="hoursChart"></canvas></div></div>
+        </div>
+        <div class="card"><div class="card-title"><span>Élèves récents</span><button class="btn btn-ghost btn-sm" onclick="showPage('students',document.querySelectorAll('.nav-item')[1])">Voir tous →</button></div>
+          <div class="table-wrap"><table><thead><tr><th>Élève</th><th>Heures</th><th>Niveau</th><th>Examen</th></tr></thead><tbody id="recent-students-table"></tbody></table></div>
+        </div>
+      </div>
+
+      <!-- ===== STUDENTS ===== -->
+      <div class="page" id="page-students">
+        <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
+          <select class="search-bar" id="filter-exam" onchange="renderStudentsTable()">
+            <option value="">Tous les statuts</option>
+            <option>En formation</option><option>Examen planifié</option><option>Réussi</option><option>Échoué</option>
+          </select>
+          <select class="search-bar" id="filter-moniteur" onchange="renderStudentsTable()" style="width:auto;">
+            <option value="">Tous les moniteurs</option>
+          </select>
+        </div>
+        <div class="card table-wrap">
+          <table>
+            <thead><tr>
+              <th onclick="sortStudents('name')">Élève <span class="sort-icon" id="sort-name">↕</span></th>
+              <th>Tél</th>
+              <th onclick="sortStudents('hours')">Heures <span class="sort-icon" id="sort-hours">↕</span></th>
+              <th onclick="sortStudents('level')">Niveau <span class="sort-icon" id="sort-level">↕</span></th>
+              <th onclick="sortStudents('exam')">Examen <span class="sort-icon" id="sort-exam">↕</span></th>
+              <th>Moniteur</th>
+              <th>Actions</th>
+            </tr></thead>
+            <tbody id="students-table"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ===== STUDENT DETAIL ===== -->
+      <div class="page" id="page-student-detail">
+        <button class="back-btn" onclick="showPage('students',document.querySelectorAll('.nav-item')[1])">← Retour aux élèves</button>
+        <div id="student-detail-content"></div>
+      </div>
+
+      <!-- ===== CALENDAR ===== -->
+      <div class="page" id="page-calendar">
+        <div class="cal-view-tabs">
+          <button class="cal-tab active" id="tab-month" onclick="setCalView('month')">📅 Mois</button>
+          <button class="cal-tab" id="tab-week" onclick="setCalView('week')">📋 Semaine</button>
+        </div>
+        <!-- VUE MOIS -->
+        <div id="cal-month-view" class="two-col">
+          <div class="card">
+            <div class="cal-month-nav"><span id="cal-month-label"></span><div><button class="cal-nav" onclick="changeMonth(-1)">◀</button><button class="cal-nav" onclick="changeMonth(1)">▶</button></div></div>
+            <div class="cal-grid" id="cal-headers"></div>
+            <div class="cal-grid" id="cal-days"></div>
+          </div>
+          <div class="card">
+            <div class="card-title"><span id="cal-events-title">Cours du mois</span><button class="btn btn-primary btn-sm" onclick="openAddEventModal()">+ Ajouter</button></div>
+            <div id="events-list"></div>
+          </div>
+        </div>
+        <!-- VUE SEMAINE -->
+        <div id="cal-week-view" style="display:none;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+            <span id="week-label" style="font-weight:600;font-size:.9rem;"></span>
+            <div style="display:flex;gap:6px;">
+              <button class="btn btn-ghost btn-sm" onclick="changeWeek(-1)">◀ Semaine préc.</button>
+              <button class="btn btn-ghost btn-sm" onclick="changeWeek(0)">Aujourd'hui</button>
+              <button class="btn btn-ghost btn-sm" onclick="changeWeek(1)">Semaine suiv. ▶</button>
+              <button class="btn btn-primary btn-sm" onclick="openAddEventModal()">+ Ajouter</button>
+            </div>
+          </div>
+          <div class="week-grid" id="week-grid"></div>
+        </div>
+      </div>
+
+      <!-- ===== SUIVI DE SÉANCE ===== -->
+      <div class="page" id="page-suivis">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <select class="search-bar" id="filter-suivi-student" onchange="renderSuivis()" style="width:auto;"><option value="">Tous les élèves</option></select>
+            <select class="search-bar" id="filter-suivi-type" onchange="renderSuivis()" style="width:auto;">
+              <option value="">Tous les types</option>
+              <option>Conduite sur circuit</option><option>Conduite en ville</option>
+              <option>Freinage d'urgence</option><option>Maniabilité</option><option>Autoroute</option><option>Cours théorique</option>
+            </select>
+            <select class="search-bar" id="filter-suivi-moniteur" onchange="renderSuivis()" style="width:auto;"><option value="">Tous les moniteurs</option></select>
+          </div>
+          <button class="btn btn-primary" onclick="openSuiviModal()">+ Nouvelle fiche</button>
+        </div>
+        <div id="suivis-list"></div>
+      </div>
+
+      <!-- ===== STATS ===== -->
+      <div class="page" id="page-stats">
+        <div class="kpi-grid">
+          <div class="kpi-card"><div class="kpi-icon">🏆</div><div class="kpi-label">Taux de réussite</div><div class="kpi-value" style="color:var(--success)" id="stat-rate">—</div><div class="kpi-sub">tous examens</div></div>
+          <div class="kpi-card"><div class="kpi-icon">📋</div><div class="kpi-label">Fiches de séance</div><div class="kpi-value" style="color:var(--accent)" id="stat-suivis">—</div><div class="kpi-sub">enregistrées</div></div>
+          <div class="kpi-card"><div class="kpi-icon">📅</div><div class="kpi-label">Cours planifiés</div><div class="kpi-value" style="color:var(--accent2)" id="stat-events">—</div><div class="kpi-sub">au total</div></div>
+        </div>
+        <div class="two-col">
+          <div class="card"><div class="card-title"><span>Niveau moyen par compétence</span></div><div class="chart-wrap-lg"><canvas id="skillRadar"></canvas></div></div>
+          <div class="card">
+            <div class="card-title" style="flex-wrap:wrap;gap:6px;">
+              <span>Évolution réelle d'un élève</span>
+              <select id="stats-student-select" class="search-bar" style="font-size:.72rem;padding:4px 8px;width:auto;" onchange="renderStudentEvolution()"></select>
+            </div>
+            <div class="chart-wrap-lg"><canvas id="evolutionChart"></canvas></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL AJOUT ÉLÈVE ===== -->
+<div class="modal-overlay" id="modal-add-student">
+  <div class="modal"><h2>➕ Nouvel élève</h2>
+    <div class="form-row">
+      <div class="form-group"><label class="required">Prénom</label><input id="new-fname" placeholder="Prénom"/><div class="field-error" id="err-fname">Champ requis</div></div>
+      <div class="form-group"><label class="required">Nom</label><input id="new-lname" placeholder="Nom"/><div class="field-error" id="err-lname">Champ requis</div></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Téléphone</label><input id="new-phone" placeholder="0692…"/></div>
+      <div class="form-group"><label>Heures effectuées</label><input id="new-hours" type="number" value="0" min="0"/></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Statut examen</label><select id="new-exam"><option>En formation</option><option>Examen planifié</option><option>Réussi</option><option>Échoué</option></select></div>
+      <div class="form-group"><label>Moniteur référent</label><select id="new-moniteur-assign" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 11px;color:var(--text);font-size:.84rem;outline:none;"></select></div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal('add-student')">Annuler</button><button class="btn btn-primary" onclick="addStudent()">Ajouter</button></div>
+  </div>
+</div>
+
+<!-- ===== MODAL COURS ===== -->
+<div class="modal-overlay" id="modal-add-event">
+  <div class="modal"><h2 id="modal-event-title">📅 Nouveau cours</h2>
+    <input type="hidden" id="ev-id"/>
+    <div class="form-group"><label class="required">Élève</label><select id="ev-student" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 11px;color:var(--text);font-size:.84rem;outline:none;"></select><div class="field-error" id="err-ev-student">Veuillez sélectionner un élève</div></div>
+    <div class="form-row">
+      <div class="form-group"><label class="required">Date</label><input id="ev-date" type="date"/><div class="field-error" id="err-ev-date">Date requise</div></div>
+      <div class="form-group"><label>Heure</label><input id="ev-time" type="time" value="09:00"/></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Type</label>
+        <select id="ev-type" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 11px;color:var(--text);font-size:.84rem;outline:none;">
+          <option>Conduite sur circuit</option><option>Conduite en ville</option><option>Freinage d'urgence</option><option>Maniabilité</option><option>Autoroute</option><option>Cours théorique</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Durée (h)</label><input id="ev-dur" type="number" value="1" min="0.5" step="0.5"/></div>
+    </div>
+    <div class="form-group"><label>Moniteur</label><select id="ev-moniteur" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 11px;color:var(--text);font-size:.84rem;outline:none;"></select></div>
+    <div class="modal-footer">
+      <button class="btn btn-danger" id="ev-delete-btn" onclick="deleteEvent()" style="display:none;margin-right:auto;">🗑 Supprimer</button>
+      <button class="btn btn-ghost" onclick="closeModal('add-event')">Annuler</button>
+      <button class="btn btn-primary" onclick="saveEvent()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL FICHE SÉANCE (2 étapes) ===== -->
+<div class="modal-overlay" id="modal-add-suivi">
+  <div class="modal"><h2>📋 Fiche de suivi de séance</h2>
+    <div class="step-indicator"><div class="step-dot active" id="sdot-1"></div><div class="step-dot" id="sdot-2"></div></div>
+    <div class="step active" id="suivi-step-1">
+      <div class="section-label">Informations du cours</div>
+      <div class="form-row">
+        <div class="form-group"><label class="required">Élève</label><select id="suivi-student" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 11px;color:var(--text);font-size:.84rem;outline:none;" onchange="onSuiviStudentChange()"></select><div class="field-error" id="err-suivi-student">Veuillez sélectionner un élève</div></div>
+        <div class="form-group"><label class="required">Date</label><input id="suivi-date" type="date"/><div class="field-error" id="err-suivi-date">Date requise</div></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Type de cours</label>
+          <select id="suivi-type" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 11px;color:var(--text);font-size:.84rem;outline:none;">
+            <option>Conduite sur circuit</option><option>Conduite en ville</option><option>Freinage d'urgence</option><option>Maniabilité</option><option>Autoroute</option><option>Cours théorique</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Durée (h)</label><input id="suivi-dur" type="number" value="1" min="0.5" step="0.5"/></div>
+      </div>
+      <div class="form-group"><label>Moniteur</label><select id="suivi-moniteur-select" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 11px;color:var(--text);font-size:.84rem;outline:none;"></select></div>
+      <div class="section-label">Compétences évaluées <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:.73rem;">(cochez celles travaillées)</span></div>
+      <div id="suivi-skills-checkboxes"></div>
+      <div class="field-error" id="err-suivi-skills" style="margin-top:-6px;margin-bottom:8px;">Cochez au moins une compétence ou passez directement au bilan</div>
+      <div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal('add-suivi')">Annuler</button><button class="btn btn-primary" onclick="suiviNextStep()">Suivant →</button></div>
+    </div>
+    <div class="step" id="suivi-step-2">
+      <div class="section-label">Bilan de séance</div>
+      <div class="form-row">
+        <div class="form-group"><label>Comportement</label>
+          <select id="suivi-comportement" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 11px;color:var(--text);font-size:.84rem;outline:none;">
+            <option>😊 Motivé</option><option>😐 Neutre</option><option>😟 Difficultés</option><option>💪 Excellent</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Sécurité</label>
+          <select id="suivi-securite" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 11px;color:var(--text);font-size:.84rem;outline:none;">
+            <option>✅ Bonne</option><option>⚠️ À améliorer</option><option>🔴 Insuffisante</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group"><label>✅ Points positifs</label><textarea id="suivi-positif" placeholder="Ce qui s'est bien passé…"></textarea></div>
+      <div class="form-group"><label>⚠️ Points à travailler</label><textarea id="suivi-ameliorer" placeholder="Ce qu'il faut retravailler…"></textarea></div>
+      <div class="form-group"><label>🎯 Objectif prochaine séance</label><input id="suivi-objectif" placeholder="Ex: maîtriser le freinage d'urgence"/></div>
+      <div class="form-group"><label>Mettre à jour les compétences ?</label>
+        <select id="suivi-update-skills" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 11px;color:var(--text);font-size:.84rem;outline:none;">
+          <option value="oui">✅ Oui, mettre à jour automatiquement</option>
+          <option value="non">Non, garder les niveaux actuels</option>
+        </select>
+      </div>
+      <div class="modal-footer"><button class="btn btn-ghost" onclick="suiviPrevStep()">← Retour</button><button class="btn btn-primary" onclick="saveSuivi()">Enregistrer la fiche</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL ÉDITION ÉLÈVE ===== -->
+<div class="modal-overlay" id="modal-edit-student">
+  <div class="modal"><h2>✏️ Modifier la fiche élève</h2>
+    <input type="hidden" id="edit-id"/>
+    <div class="form-row">
+      <div class="form-group"><label class="required">Prénom</label><input id="edit-fname"/><div class="field-error" id="err-edit-fname">Champ requis</div></div>
+      <div class="form-group"><label class="required">Nom</label><input id="edit-lname"/><div class="field-error" id="err-edit-lname">Champ requis</div></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Téléphone</label><input id="edit-phone"/></div>
+      <div class="form-group"><label>Heures effectuées</label><input id="edit-hours" type="number" min="0"/></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Statut examen</label><select id="edit-exam"><option>En formation</option><option>Examen planifié</option><option>Réussi</option><option>Échoué</option></select></div>
+      <div class="form-group"><label>Moniteur référent</label><select id="edit-moniteur-assign" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 11px;color:var(--text);font-size:.84rem;outline:none;"></select></div>
+    </div>
+    <div class="form-group"><label>Commentaire / objectifs</label><textarea id="edit-comment" placeholder="Remarques libres…"></textarea></div>
+    <div class="section-label">Compétences</div>
+    <div id="edit-skills-inputs"></div>
+    <div class="modal-footer">
+      <button class="btn btn-danger" onclick="deleteStudent()" style="margin-right:auto;">🗑 Supprimer</button>
+      <button class="btn btn-ghost" onclick="closeModal('edit-student')">Annuler</button>
+      <button class="btn btn-primary" onclick="saveEditStudent()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL EXPORT ===== -->
+<div class="modal-overlay" id="modal-export-data">
+  <div class="modal"><h2>📤 Exporter les données</h2>
+    <p style="font-size:.84rem;color:var(--muted);margin-bottom:16px;">Téléchargez une sauvegarde complète de toutes vos données (élèves, cours, fiches de séance). Vous pouvez la réimporter sur n'importe quel appareil.</p>
+    <div style="background:var(--surface);border-radius:8px;padding:12px;font-size:.82rem;margin-bottom:16px;" id="export-summary"></div>
+    <div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal('export-data')">Fermer</button><button class="btn btn-primary" onclick="exportData()">📥 Télécharger le fichier JSON</button></div>
+  </div>
+</div>
+
+<!-- ===== MODAL MONITEURS ===== -->
+<div class="modal-overlay" id="modal-moniteurs">
+  <div class="modal"><h2>👤 Gérer les moniteurs</h2>
+    <div id="moniteurs-list" style="margin-bottom:14px;"></div>
+    <div class="form-row" style="margin-bottom:0;">
+      <div class="form-group" style="margin-bottom:0;"><label>Nouveau moniteur</label><input id="new-moniteur-name" placeholder="Nom du moniteur"/></div>
+      <div class="form-group" style="margin-bottom:0;display:flex;align-items:flex-end;"><button class="btn btn-primary" style="width:100%;" onclick="addMoniteur()">Ajouter</button></div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal('moniteurs')">Fermer</button></div>
+  </div>
+</div>
+
+<script>
+// ===== CONSTANTES =====
+const COLORS=['#f97316','#6366f1','#10b981','#f43f5e','#f59e0b','#06b6d4','#a78bfa','#34d399'];
+const SKILLS=['Freinage','Virage','Maniabilité','Équilibre','Signalisation','Vitesse'];
+const LEVELS=['Débutant','En progression','Acquis','Maîtrisé'];
+const LEVEL_CLASS={Débutant:'debutant','En progression':'progression',Acquis:'acquis',Maîtrisé:'maitrise'};
+const LEVEL_VAL={Débutant:1,'En progression':2,Acquis:3,Maîtrisé:4};
+const STORE_KEY='boisdo_v2';
+let darkMode=true;
+let sortState={col:null,asc:true};
+let calView='month';
+let calMonth=new Date();
+let weekStart=mondayOf(new Date());
+let selectedDay=null;
+
+function today(){return new Date().toISOString().split('T')[0];}
+function nextDate(n){const d=new Date();d.setDate(d.getDate()+n);return d.toISOString().split('T')[0];}
+function mondayOf(d){const c=new Date(d);const day=c.getDay();const diff=c.getDate()-(day===0?6:day-1);c.setDate(diff);return c;}
+
+// ===== DONNÉES PAR DÉFAUT =====
+let moniteurs=[
+  {id:1,name:'Jean-Pierre'},
+  {id:2,name:'Marie'},
+];
+let students=[
+  {id:1,fname:'Kévin',lname:'Moreau',phone:'0692 11 22 33',hours:18,exam:'Réussi',comment:'Élève sérieux.',moniteurId:1,skills:{Freinage:'Maîtrisé',Virage:'Acquis',Maniabilité:'Acquis',Équilibre:'Maîtrisé',Signalisation:'Acquis',Vitesse:'Acquis'},history:[{date:nextDate(-20),type:'Conduite sur circuit',dur:1},{date:nextDate(-15),type:'Freinage d\'urgence',dur:1.5}]},
+  {id:2,fname:'Léa',lname:'Bernard',phone:'0693 44 55 66',hours:12,exam:'Examen planifié',comment:'',moniteurId:1,skills:{Freinage:'Acquis',Virage:'En progression',Maniabilité:'En progression',Équilibre:'Acquis',Signalisation:'En progression',Vitesse:'En progression'},history:[{date:nextDate(-22),type:'Maniabilité',dur:1}]},
+  {id:3,fname:'Théo',lname:'Martin',phone:'0692 77 88 99',hours:8,exam:'En formation',comment:'Débutant motivé.',moniteurId:2,skills:{Freinage:'En progression',Virage:'Débutant',Maniabilité:'En progression',Équilibre:'Débutant',Signalisation:'En progression',Vitesse:'Débutant'},history:[{date:nextDate(-12),type:'Cours théorique',dur:1}]},
+  {id:4,fname:'Amina',lname:'Ousseni',phone:'0693 12 34 56',hours:22,exam:'Réussi',comment:'Excellente élève.',moniteurId:2,skills:{Freinage:'Maîtrisé',Virage:'Maîtrisé',Maniabilité:'Maîtrisé',Équilibre:'Maîtrisé',Signalisation:'Acquis',Vitesse:'Maîtrisé'},history:[{date:nextDate(-30),type:'Autoroute',dur:2}]},
+  {id:5,fname:'Jordan',lname:'Hoarau',phone:'0692 98 76 54',hours:5,exam:'En formation',comment:'',moniteurId:1,skills:{Freinage:'Débutant',Virage:'Débutant',Maniabilité:'Débutant',Équilibre:'Débutant',Signalisation:'En progression',Vitesse:'Débutant'},history:[]},
+  {id:6,fname:'Camille',lname:'Grondin',phone:'0693 65 43 21',hours:15,exam:'Échoué',comment:'Retravailler freinage.',moniteurId:2,skills:{Freinage:'En progression',Virage:'En progression',Maniabilité:'Acquis',Équilibre:'En progression',Signalisation:'Acquis',Vitesse:'En progression'},history:[{date:nextDate(-8),type:'Freinage d\'urgence',dur:1.5}]},
+  {id:7,fname:'Yannick',lname:'Payet',phone:'0692 55 44 33',hours:20,exam:'Examen planifié',comment:'',moniteurId:1,skills:{Freinage:'Acquis',Virage:'Maîtrisé',Maniabilité:'Acquis',Équilibre:'Acquis',Signalisation:'Acquis',Vitesse:'Acquis'},history:[{date:nextDate(-5),type:'Autoroute',dur:2}]},
+  {id:8,fname:'Sonia',lname:'Fontaine',phone:'0693 22 11 00',hours:10,exam:'En formation',comment:'',moniteurId:2,skills:{Freinage:'En progression',Virage:'En progression',Maniabilité:'En progression',Équilibre:'En progression',Signalisation:'Acquis',Vitesse:'En progression'},history:[{date:nextDate(-14),type:'Maniabilité',dur:1}]},
+];
+let events=[
+  {id:1,studentId:1,date:today(),time:'09:00',type:'Conduite sur circuit',dur:1,moniteurId:1},
+  {id:2,studentId:2,date:today(),time:'10:30',type:'Freinage d\'urgence',dur:1.5,moniteurId:1},
+  {id:3,studentId:4,date:today(),time:'14:00',type:'Maniabilité',dur:1,moniteurId:2},
+  {id:4,studentId:7,date:today(),time:'16:00',type:'Conduite en ville',dur:2,moniteurId:1},
+  {id:5,studentId:3,date:nextDate(2),time:'09:00',type:'Conduite sur circuit',dur:1,moniteurId:2},
+  {id:6,studentId:5,date:nextDate(3),time:'11:00',type:'Maniabilité',dur:1.5,moniteurId:1},
+  {id:7,studentId:6,date:nextDate(5),time:'15:00',type:'Freinage d\'urgence',dur:1,moniteurId:2},
+  {id:8,studentId:8,date:nextDate(7),time:'10:00',type:'Conduite en ville',dur:2,moniteurId:2},
+];
+let suivis=[
+  {id:101,studentId:1,date:nextDate(-2),type:'Conduite sur circuit',dur:1,moniteurId:1,skills:{Freinage:'Maîtrisé',Virage:'Acquis'},comportement:'💪 Excellent',securite:'✅ Bonne',positif:'Freinage précis.',ameliorer:'Signalisation en intersection.',objectif:'Enchaîner virages et freinage.'},
+  {id:102,studentId:2,date:nextDate(-3),type:'Maniabilité',dur:1,moniteurId:1,skills:{Maniabilité:'En progression'},comportement:'😊 Motivé',securite:'✅ Bonne',positif:'Bonne progression slalom.',ameliorer:'Manque de fluidité à basse vitesse.',objectif:'Maîtriser le 8 sans poser le pied.'},
+  {id:103,studentId:3,date:nextDate(-5),type:'Freinage d\'urgence',dur:1,moniteurId:2,skills:{Freinage:'En progression'},comportement:'😐 Neutre',securite:'⚠️ À améliorer',positif:'Réactions correctes sol sec.',ameliorer:'Panique sur sol mouillé.',objectif:'Réduire temps de réaction.'},
+  {id:104,studentId:6,date:nextDate(-6),type:'Conduite en ville',dur:1.5,moniteurId:2,skills:{Signalisation:'Acquis'},comportement:'😟 Difficultés',securite:'⚠️ À améliorer',positif:'Bonne lecture panneaux.',ameliorer:'Manque de confiance en insertion.',objectif:'Reprendre manœuvres d\'insertion.'},
+];
+let nextId=200;
+let currentMoniteurId=1; // Moniteur connecté par défaut
+
+// ===== LOCALSTORAGE =====
+function saveData(){
+  try{
+    const json=JSON.stringify({students,events,suivis,moniteurs,nextId,currentMoniteurId});
+    localStorage.setItem(STORE_KEY,json);
+    updateStorageInfo();
+  }catch(e){showToast('⚠️ Erreur de sauvegarde — stockage plein ?','warn');}
+}
+function loadData(){
+  try{
+    const d=localStorage.getItem(STORE_KEY);
+    if(d){const p=JSON.parse(d);
+      students=p.students||students;events=p.events||events;
+      suivis=p.suivis||suivis;moniteurs=p.moniteurs||moniteurs;
+      nextId=p.nextId||nextId;currentMoniteurId=p.currentMoniteurId||currentMoniteurId;
+    }
+  }catch(e){console.warn('Load failed',e);}
+}
+function updateStorageInfo(){
+  try{
+    const used=new Blob([localStorage.getItem(STORE_KEY)||'']).size;
+    const maxBytes=5*1024*1024;
+    const pct=Math.round(used/maxBytes*100);
+    document.getElementById('storage-info').textContent=`Stockage : ${pct}% utilisé`;
+    const banner=document.getElementById('storage-alert-banner');
+    if(banner){
+      banner.style.display=pct>75?'block':'none';
+      const el=document.getElementById('storage-pct');
+      if(el)el.textContent=pct;
+    }
+  }catch(e){}
+}
+
+// ===== EXPORT / IMPORT =====
+function exportData(){
+  const data={version:2,exported:new Date().toISOString(),students,events,suivis,moniteurs,nextId};
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download=`boisdo-sauvegarde-${today()}.json`;
+  document.body.appendChild(a);a.click();
+  document.body.removeChild(a);URL.revokeObjectURL(url);
+  showToast('Données exportées ✅');closeModal('export-data');
+}
+function importData(event){
+  const file=event.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const d=JSON.parse(e.target.result);
+      if(!d.students)throw new Error('Format invalide');
+      if(!confirm(`Importer ${d.students.length} élèves, ${d.events?.length||0} cours, ${d.suivis?.length||0} fiches ?\nVos données actuelles seront remplacées.`))return;
+      students=d.students;events=d.events||[];suivis=d.suivis||[];
+      moniteurs=d.moniteurs||moniteurs;nextId=d.nextId||nextId;
+      saveData();renderDashboard();
+      showToast(`Import réussi : ${students.length} élèves ✅`);
+    }catch(err){showToast('Fichier invalide ou corrompu','error');}
+  };
+  reader.readAsText(file);
+  event.target.value='';
+}
+function openExportModal(){
+  document.getElementById('export-summary').innerHTML=`
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      <div>👥 <strong>${students.length}</strong> élèves</div>
+      <div>📅 <strong>${events.length}</strong> cours planifiés</div>
+      <div>📋 <strong>${suivis.length}</strong> fiches de séance</div>
+      <div>👤 <strong>${moniteurs.length}</strong> moniteur${moniteurs.length>1?'s':''}</div>
+    </div>`;
+  openModal('export-data');
+}
+
+// ===== MONITEURS =====
+function currentMoniteur(){return moniteurs.find(m=>m.id===currentMoniteurId)||moniteurs[0]||{id:0,name:'Inconnu'};}
+function updateMoniteurLabel(){const m=currentMoniteur();document.getElementById('current-moniteur-name').textContent=m.name;}
+function populateMoniteurSelects(){
+  const opts=moniteurs.map(m=>`<option value="${m.id}">${m.name}</option>`).join('');
+  ['ev-moniteur','suivi-moniteur-select','new-moniteur-assign','edit-moniteur-assign'].forEach(id=>{
+    const el=document.getElementById(id);if(el){el.innerHTML=opts;el.value=currentMoniteurId;}
+  });
+  // Filtres
+  const fOpts='<option value="">Tous les moniteurs</option>'+opts;
+  ['filter-moniteur','filter-suivi-moniteur'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=fOpts;});
+}
+function addMoniteur(){
+  const name=document.getElementById('new-moniteur-name').value.trim();
+  if(!name){showToast('Nom requis','error');return;}
+  moniteurs.push({id:nextId++,name});
+  saveData();renderMoniteursList();populateMoniteurSelects();
+  document.getElementById('new-moniteur-name').value='';
+  showToast('Moniteur ajouté ✅');
+}
+function deleteMoniteur(id){
+  if(moniteurs.length<=1){showToast('Impossible : au moins un moniteur requis','error');return;}
+  if(!confirm('Supprimer ce moniteur ?'))return;
+  moniteurs=moniteurs.filter(m=>m.id!==id);
+  if(currentMoniteurId===id)currentMoniteurId=moniteurs[0].id;
+  saveData();renderMoniteursList();populateMoniteurSelects();updateMoniteurLabel();
+  showToast('Moniteur supprimé');
+}
+function switchMoniteur(id){currentMoniteurId=id;saveData();updateMoniteurLabel();closeModal('moniteurs');showToast('Moniteur actif : '+currentMoniteur().name);}
+function renderMoniteursList(){
+  document.getElementById('moniteurs-list').innerHTML=moniteurs.map(m=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">
+      <span style="flex:1;font-size:.85rem;font-weight:${m.id===currentMoniteurId?'700':'400'};color:${m.id===currentMoniteurId?'var(--accent)':'var(--text)'};">
+        ${m.id===currentMoniteurId?'👤 ':''} ${m.name} ${m.id===currentMoniteurId?'<span class="moniteur-badge">Actif</span>':''}
+      </span>
+      ${m.id!==currentMoniteurId?`<button class="btn btn-ghost btn-sm" onclick="switchMoniteur(${m.id})">Choisir</button>`:''}
+      <button class="btn btn-danger btn-sm" onclick="deleteMoniteur(${m.id})">🗑</button>
+    </div>`).join('');
+}
+
+// ===== TOAST =====
+function showToast(msg,type=''){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.className='toast'+(type?' '+type:'');
+  t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000);
+}
+
+// ===== THEME =====
+function toggleTheme(){
+  darkMode=!darkMode;
+  document.body.classList.toggle('light',!darkMode);
+  document.getElementById('theme-btn').textContent=darkMode?'🌙':'☀️';
+  const p=document.querySelector('.page.active').id.replace('page-','');
+  if(p==='dashboard')renderDashboard();
+  if(p==='stats')renderStats();
+}
+
+// ===== SIDEBAR =====
+function toggleSidebar(){document.getElementById('sidebar').classList.toggle('open');document.getElementById('sidebar-overlay').classList.toggle('open');}
+function closeSidebar(){document.getElementById('sidebar').classList.remove('open');document.getElementById('sidebar-overlay').classList.remove('open');}
+
+// ===== NAVIGATION =====
+function showPage(name,navEl){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  if(navEl)navEl.classList.add('active');
+  else{const map={dashboard:0,students:1,calendar:2,suivis:3,stats:4,'student-detail':1};const i=map[name];if(i!==undefined)document.querySelectorAll('.nav-item')[i].classList.add('active');}
+  const titles={dashboard:'Tableau de bord',students:'Élèves',calendar:'Agenda',suivis:'Suivi de séance','student-detail':'Fiche élève',stats:'Statistiques'};
+  document.getElementById('page-title').textContent=titles[name]||name;
+  closeSidebar();
+  if(name==='students')renderStudentsTable();
+  if(name==='calendar'){renderCalendar();if(calView==='week')renderWeek();}
+  if(name==='suivis')renderSuivis();
+  if(name==='stats')renderStats();
+  if(name==='dashboard')renderDashboard();
+}
+
+// ===== HELPERS =====
+function avgSkillVal(s){return Math.round(Object.values(s.skills).reduce((a,b)=>a+LEVEL_VAL[b],0)/SKILLS.length);}
+function avgSkillLabel(s){return LEVELS[avgSkillVal(s)-1]||LEVELS[0];}
+function skillBadge(level){return`<span class="skill-badge ${LEVEL_CLASS[level]||'debutant'}">${level}</span>`;}
+function examTag(e){return{'Réussi':'tag-green','En formation':'tag-blue','Examen planifié':'tag-orange','Échoué':'tag-red'}[e]||'tag-blue';}
+function isReadyForExam(s){return Object.values(s.skills).every(v=>v==='Acquis'||v==='Maîtrisé');}
+function moniteurName(id){const m=moniteurs.find(x=>x.id===id);return m?m.name:'—';}
+
+// ===== VALIDATION =====
+function validateField(inputId,errId,condition){
+  const el=document.getElementById(inputId);const er=document.getElementById(errId);
+  if(!condition){el?.classList.add('error');er?.classList.add('show');return false;}
+  el?.classList.remove('error');er?.classList.remove('show');return true;
+}
+function clearErrors(...ids){ids.forEach(id=>{document.getElementById(id)?.classList.remove('error','show');});}
+
+// ===== DASHBOARD =====
+function renderDashboard(){
+  const passed=students.filter(s=>s.exam==='Réussi').length;
+  const ready=students.filter(s=>s.exam!=='Réussi'&&isReadyForExam(s));
+  document.getElementById('kpi-total').textContent=students.length;
+  document.getElementById('kpi-passed').textContent=passed;
+  document.getElementById('kpi-rate').textContent=students.length?Math.round(passed/students.length*100)+'%':'—';
+  document.getElementById('kpi-ready').textContent=ready.length;
+  document.getElementById('ready-alerts').innerHTML=ready.map(s=>`
+    <div class="ready-alert">🏆 <strong>${s.fname} ${s.lname}</strong> a toutes ses compétences ok — <span style="color:var(--success)">prêt pour l'examen !</span>
+    <button class="btn btn-ghost btn-sm" style="margin-left:auto;" onclick="openStudentDetail(${s.id})">Voir fiche</button></div>`).join('');
+  // Cours du jour
+  const tEvs=events.filter(e=>e.date===today()).sort((a,b)=>a.time.localeCompare(b.time));
+  document.getElementById('today-count').textContent=tEvs.length+' cours';
+  document.getElementById('today-events').innerHTML=tEvs.length?tEvs.map(e=>{
+    const s=students.find(x=>x.id===e.studentId);
+    return`<div class="event-item clickable" onclick="openSuiviFromEvent(${e.id})" title="Remplir la fiche de séance">
+      <div class="event-dot" style="background:var(--accent2)"></div>
+      <div style="flex:1"><div class="event-time">${e.time} — ${e.dur}h · <span class="moniteur-badge">${moniteurName(e.moniteurId)}</span></div>
+      <div class="event-title">${s?s.fname+' '+s.lname:'?'} · ${e.type}</div></div>
+      <span style="font-size:.71rem;color:var(--accent);font-weight:600;">+ Fiche</span>
+    </div>`;
+  }).join(''):'<p style="color:var(--muted);font-size:.82rem;">Aucun cours aujourd\'hui.</p>';
+  // Compétences
+  document.getElementById('skills-overview').innerHTML=SKILLS.map(sk=>{
+    const counts={Débutant:0,'En progression':0,Acquis:0,Maîtrisé:0};
+    students.forEach(s=>counts[s.skills[sk]]++);
+    const dom=Object.entries(counts).sort((a,b)=>b[1]-a[1])[0][0];
+    return`<div class="skill-row"><div class="skill-name">${sk}</div>${skillBadge(dom)}<span style="font-size:.69rem;color:var(--muted);margin-left:6px;">(${counts[dom]})</span></div>`;
+  }).join('');
+  // Charts
+  renderDonut('examChart',['En formation','Examen planifié','Réussi','Échoué'],['En formation','Examen planifié','Réussi','Échoué'].map(s=>students.filter(x=>x.exam===s).length),['#6366f1','#f59e0b','#10b981','#f43f5e']);
+  const months=[];const counts=[];
+  for(let i=5;i>=0;i--){const d=new Date();d.setMonth(d.getMonth()-i);const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;months.push(d.toLocaleDateString('fr-FR',{month:'short'}));counts.push(suivis.filter(f=>f.date.startsWith(key)).length);}
+  renderLine('hoursChart',months,counts);
+  // Recent students
+  document.getElementById('recent-students-table').innerHTML=students.slice(0,5).map(s=>{
+    const c=COLORS[s.id%COLORS.length];
+    return`<tr><td><div class="student-name"><div class="avatar" style="background:${c}20;color:${c}">${s.fname[0]+s.lname[0]}</div>${s.fname} ${s.lname}${isReadyForExam(s)&&s.exam!=='Réussi'?'<span class="ready-badge" style="margin-left:5px;">Prêt</span>':''}</div></td><td>${s.hours}h</td><td>${skillBadge(avgSkillLabel(s))}</td><td><span class="tag ${examTag(s.exam)}">${s.exam}</span></td></tr>`;
+  }).join('');
+  updateStorageInfo();
+}
+
+// ===== STUDENTS TABLE =====
+function sortStudents(col){
+  if(sortState.col===col)sortState.asc=!sortState.asc;else{sortState.col=col;sortState.asc=true;}
+  document.querySelectorAll('th .sort-icon').forEach(el=>el.textContent='↕');
+  document.querySelectorAll('#students-table').forEach(()=>{});
+  const icon=document.getElementById('sort-'+col);
+  if(icon){icon.textContent=sortState.asc?'↑':'↓';icon.closest('th').classList.add('sorted');}
+  renderStudentsTable();
+}
+function renderStudentsTable(){
+  const filter=document.getElementById('filter-exam').value;
+  const filterM=document.getElementById('filter-moniteur').value;
+  populateMoniteurSelects();
+  document.getElementById('filter-moniteur').value=filterM;
+  const q=document.getElementById('global-search').value.toLowerCase();
+  let list=filter?students.filter(s=>s.exam===filter):[...students];
+  if(filterM)list=list.filter(s=>s.moniteurId==filterM);
+  if(q)list=list.filter(s=>(s.fname+' '+s.lname).toLowerCase().includes(q)||(s.phone||'').includes(q));
+  if(sortState.col){
+    list.sort((a,b)=>{
+      let va,vb;
+      if(sortState.col==='name'){va=a.lname+a.fname;vb=b.lname+b.fname;}
+      else if(sortState.col==='hours'){va=a.hours;vb=b.hours;}
+      else if(sortState.col==='level'){va=avgSkillVal(a);vb=avgSkillVal(b);}
+      else if(sortState.col==='exam'){va=a.exam;vb=b.exam;}
+      if(va<vb)return sortState.asc?-1:1;if(va>vb)return sortState.asc?1:-1;return 0;
+    });
+  }
+  document.getElementById('students-table').innerHTML=list.map(s=>{
+    const c=COLORS[s.id%COLORS.length];const ready=isReadyForExam(s)&&s.exam!=='Réussi';
+    return`<tr>
+      <td><div class="student-name"><div class="avatar" style="background:${c}20;color:${c}">${s.fname[0]+s.lname[0]}</div>${s.fname} ${s.lname}${ready?'<span class="ready-badge" style="margin-left:5px;">Prêt</span>':''}</div></td>
+      <td style="color:var(--muted)">${s.phone}</td><td>${s.hours}h</td>
+      <td>${skillBadge(avgSkillLabel(s))}</td>
+      <td><span class="tag ${examTag(s.exam)}">${s.exam}</span></td>
+      <td><span class="moniteur-badge">${moniteurName(s.moniteurId)}</span></td>
+      <td><button class="btn btn-ghost btn-sm" onclick="openStudentDetail(${s.id})">Fiche</button></td>
+    </tr>`;
+  }).join('')||'<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:22px">Aucun élève.</td></tr>';
+}
+
+// ===== STUDENT DETAIL =====
+function openStudentDetail(id){
+  const s=students.find(x=>x.id===id);if(!s)return;
+  showPage('student-detail',null);
+  const c=COLORS[s.id%COLORS.length];
+  const hist=[...s.history].sort((a,b)=>b.date.localeCompare(a.date));
+  const sNotes=suivis.filter(n=>n.studentId===id).sort((a,b)=>b.date.localeCompare(a.date));
+  const ready=isReadyForExam(s)&&s.exam!=='Réussi';
+  document.getElementById('student-detail-content').innerHTML=`
+    <div class="detail-header">
+      <div class="detail-avatar" style="background:${c}20;color:${c}">${s.fname[0]+s.lname[0]}</div>
+      <div class="detail-info">
+        <h2>${s.fname} ${s.lname} ${ready?'<span class="ready-badge">🏆 Prêt pour l\'examen</span>':''}</h2>
+        <p>${s.phone} &nbsp;·&nbsp; <span class="tag ${examTag(s.exam)}">${s.exam}</span> &nbsp;·&nbsp; <span class="moniteur-badge">👤 ${moniteurName(s.moniteurId)}</span></p>
+        ${s.comment?`<p style="margin-top:5px;font-style:italic;font-size:.8rem;color:var(--muted)">${s.comment}</p>`:''}
+      </div>
+      <div style="margin-left:auto;display:flex;gap:7px;flex-wrap:wrap;">
+        <button class="btn btn-ghost btn-sm" onclick="openSuiviModal(${id})">+ Fiche séance</button>
+        <button class="btn btn-primary btn-sm" onclick="openEditModal(${id})">✏️ Modifier</button>
+      </div>
+    </div>
+    <div class="two-stat">
+      <div class="stat-pill"><div class="sp-icon">⏱️</div><div><div class="sp-val">${s.hours}h</div><div class="sp-lbl">Heures effectuées</div></div></div>
+      <div class="stat-pill"><div class="sp-icon">📋</div><div><div class="sp-val">${sNotes.length}</div><div class="sp-lbl">Fiches de séance</div></div></div>
+    </div>
+    <div class="two-col" style="margin-top:14px;">
+      <div class="card">
+        <div class="card-title"><span>Compétences</span></div>
+        ${SKILLS.map(sk=>`<div class="skill-row"><div class="skill-name">${sk}</div>${skillBadge(s.skills[sk])}</div>`).join('')}
+      </div>
+      <div class="card">
+        <div class="card-title"><span>Historique des cours</span><span style="font-size:.72rem;color:var(--muted)">${hist.length} séance${hist.length>1?'s':''}</span></div>
+        ${hist.length?hist.map(h=>`<div class="hist-item"><div class="event-dot" style="background:var(--accent2);flex-shrink:0;margin-top:0;"></div><div class="hist-type">${h.type}</div><div class="hist-date">${h.date}</div><div class="hist-dur">${h.dur}h</div></div>`).join(''):'<p style="color:var(--muted);font-size:.81rem;">Aucun historique.</p>'}
+      </div>
+    </div>
+    <div class="card" style="margin-top:14px;">
+      <div class="card-title"><span>Dernières fiches de séance</span><span style="font-size:.72rem;color:var(--muted)">${sNotes.length} fiche${sNotes.length>1?'s':''}</span></div>
+      ${sNotes.length?sNotes.slice(0,3).map(n=>`<div class="note-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:5px;">
+          <div class="note-date">${n.date} · ${n.type} (${n.dur}h) · <span class="moniteur-badge">${moniteurName(n.moniteurId)}</span></div>
+          <div style="display:flex;gap:5px;align-items:center;"><span style="font-size:.74rem">${n.comportement}</span><button class="btn btn-danger btn-sm" onclick="deleteSuivi(${n.id},${id})">🗑</button></div>
+        </div>
+        ${n.positif?`<div style="font-size:.78rem;color:var(--success);margin-bottom:3px;">✅ ${n.positif}</div>`:''}
+        ${n.ameliorer?`<div style="font-size:.78rem;color:var(--warning);">⚠️ ${n.ameliorer}</div>`:''}
+        ${n.objectif?`<div style="font-size:.78rem;color:var(--accent2);margin-top:4px;">🎯 ${n.objectif}</div>`:''}
+      </div>`).join(''):'<p style="color:var(--muted);font-size:.81rem;">Aucune fiche de séance.</p>'}
+    </div>`;
+}
+
+// ===== EDIT MODAL =====
+function openEditModal(id){
+  const s=students.find(x=>x.id===id);if(!s)return;
+  populateMoniteurSelects();
+  document.getElementById('edit-id').value=id;
+  document.getElementById('edit-fname').value=s.fname;
+  document.getElementById('edit-lname').value=s.lname;
+  document.getElementById('edit-phone').value=s.phone;
+  document.getElementById('edit-hours').value=s.hours;
+  document.getElementById('edit-exam').value=s.exam;
+  document.getElementById('edit-comment').value=s.comment||'';
+  document.getElementById('edit-moniteur-assign').value=s.moniteurId||currentMoniteurId;
+  document.getElementById('edit-skills-inputs').innerHTML=SKILLS.map(sk=>`
+    <div class="skill-row"><div class="skill-name">${sk}</div>
+    <select class="skill-select" id="ep-${sk}">${LEVELS.map(l=>`<option value="${l}"${s.skills[sk]===l?' selected':''}>${l}</option>`).join('')}</select></div>`).join('');
+  openModal('edit-student');
+}
+function saveEditStudent(){
+  const id=parseInt(document.getElementById('edit-id').value);
+  const fname=document.getElementById('edit-fname').value.trim();
+  const lname=document.getElementById('edit-lname').value.trim();
+  let ok=true;
+  ok=validateField('edit-fname','err-edit-fname',!!fname)&&ok;
+  ok=validateField('edit-lname','err-edit-lname',!!lname)&&ok;
+  if(!ok)return;
+  const s=students.find(x=>x.id===id);if(!s)return;
+  s.fname=fname;s.lname=lname;
+  s.phone=document.getElementById('edit-phone').value||s.phone;
+  s.hours=parseInt(document.getElementById('edit-hours').value)||s.hours;
+  s.exam=document.getElementById('edit-exam').value;
+  s.comment=document.getElementById('edit-comment').value;
+  s.moniteurId=parseInt(document.getElementById('edit-moniteur-assign').value)||s.moniteurId;
+  SKILLS.forEach(sk=>{const v=document.getElementById('ep-'+sk).value;if(LEVELS.includes(v))s.skills[sk]=v;});
+  saveData();closeModal('edit-student');showToast('Fiche élève mise à jour ✅');openStudentDetail(id);
+}
+function deleteStudent(){
+  const id=parseInt(document.getElementById('edit-id').value);
+  if(!confirm('Supprimer cet élève définitivement ?'))return;
+  students=students.filter(s=>s.id!==id);
+  events=events.filter(e=>e.studentId!==id);
+  suivis=suivis.filter(f=>f.studentId!==id);
+  saveData();closeModal('edit-student');showToast('Élève supprimé');showPage('students',document.querySelectorAll('.nav-item')[1]);
+}
+
+// ===== CALENDAR =====
+function setCalView(v){
+  calView=v;
+  document.getElementById('cal-month-view').style.display=v==='month'?'':'none';
+  document.getElementById('cal-week-view').style.display=v==='week'?'block':'none';
+  document.getElementById('tab-month').classList.toggle('active',v==='month');
+  document.getElementById('tab-week').classList.toggle('active',v==='week');
+  if(v==='month')renderCalendar();else renderWeek();
+}
+function renderCalendar(){
+  const months=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+  document.getElementById('cal-month-label').textContent=months[calMonth.getMonth()]+' '+calMonth.getFullYear();
+  document.getElementById('cal-headers').innerHTML=['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'].map(d=>`<div class="cal-header">${d}</div>`).join('');
+  const first=new Date(calMonth.getFullYear(),calMonth.getMonth(),1);
+  const last=new Date(calMonth.getFullYear(),calMonth.getMonth()+1,0);
+  let sdow=first.getDay();sdow=sdow===0?6:sdow-1;
+  const evDays=new Set(events.filter(e=>{const d=new Date(e.date);return d.getMonth()===calMonth.getMonth()&&d.getFullYear()===calMonth.getFullYear();}).map(e=>new Date(e.date).getDate()));
+  const todayDate=new Date();
+  let html=Array(sdow).fill('<div class="cal-day empty">.</div>').join('');
+  for(let i=1;i<=last.getDate();i++){
+    const isT=calMonth.getMonth()===todayDate.getMonth()&&calMonth.getFullYear()===todayDate.getFullYear()&&i===todayDate.getDate();
+    const isS=selectedDay===i;
+    html+=`<div class="cal-day${isT?' today':''}${evDays.has(i)&&!isT?' has-event':''}${isS&&!isT?' selected':''}" onclick="filterEventsByDay(${i})">${i}</div>`;
+  }
+  document.getElementById('cal-days').innerHTML=html;
+  renderEventsList();
+}
+function changeMonth(d){calMonth.setMonth(calMonth.getMonth()+d);selectedDay=null;renderCalendar();}
+function filterEventsByDay(d){
+  selectedDay=selectedDay===d?null:d;
+  document.getElementById('cal-events-title').textContent=selectedDay?`Cours du ${selectedDay}`:'Cours du mois';
+  renderCalendar();
+}
+function renderEventsList(){
+  const list=events.filter(e=>{
+    const dt=new Date(e.date);
+    if(dt.getMonth()!==calMonth.getMonth()||dt.getFullYear()!==calMonth.getFullYear())return false;
+    if(selectedDay&&new Date(e.date).getDate()!==selectedDay)return false;
+    return true;
+  }).sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time));
+  document.getElementById('events-list').innerHTML=list.length?list.map(e=>{
+    const s=students.find(x=>x.id===e.studentId);const col=COLORS[(s?s.id:0)%COLORS.length];
+    return`<div class="event-item" style="justify-content:space-between;">
+      <div style="display:flex;gap:10px;align-items:flex-start;flex:1;">
+        <div class="event-dot" style="background:${col};margin-top:5px;"></div>
+        <div><div class="event-time">${e.date} à ${e.time} (${e.dur}h) · <span class="moniteur-badge">${moniteurName(e.moniteurId)}</span></div>
+        <div class="event-title">${s?s.fname+' '+s.lname:'?'} · ${e.type}</div></div>
+      </div>
+      <div style="display:flex;gap:4px;flex-shrink:0;">
+        <button class="btn btn-ghost btn-sm" onclick="editEvent(${e.id})">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="confirmDeleteEvent(${e.id})">🗑</button>
+      </div>
+    </div>`;
+  }).join(''):'<p style="color:var(--muted);font-size:.81rem;">Aucun cours.</p>';
+}
+
+// ===== WEEK VIEW =====
+function changeWeek(dir){
+  if(dir===0){weekStart=mondayOf(new Date());}
+  else{weekStart.setDate(weekStart.getDate()+dir*7);}
+  renderWeek();
+}
+function renderWeek(){
+  const days=['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
+  const todayStr=today();
+  let html='';
+  for(let i=0;i<7;i++){
+    const d=new Date(weekStart);d.setDate(d.getDate()+i);
+    const dStr=d.toISOString().split('T')[0];
+    const isToday=dStr===todayStr;
+    const dayEvs=events.filter(e=>e.date===dStr).sort((a,b)=>a.time.localeCompare(b.time));
+    html+=`<div class="week-day-col">
+      <div class="week-day-header${isToday?' today-col':''}">
+        <div>${days[i]}</div>
+        <div style="font-size:.8rem;color:${isToday?'var(--accent)':'var(--text)'};">${d.getDate()}/${d.getMonth()+1}</div>
+      </div>
+      ${dayEvs.map(e=>{
+        const s=students.find(x=>x.id===e.studentId);
+        return`<div class="week-event" onclick="editEvent(${e.id})">
+          <div class="we-time">${e.time} · ${e.dur}h</div>
+          <div class="we-name">${s?s.fname+' '+s.lname[0]+'.':'?'}</div>
+          <div style="font-size:.65rem;color:var(--muted);margin-top:1px;">${e.type}</div>
+        </div>`;
+      }).join('')}
+      ${!dayEvs.length?`<div style="font-size:.7rem;color:var(--border);text-align:center;padding:8px;">—</div>`:''}
+    </div>`;
+  }
+  document.getElementById('week-grid').innerHTML=html;
+  const from=weekStart.toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
+  const to=new Date(weekStart.getTime()+6*86400000).toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
+  document.getElementById('week-label').textContent=`Semaine du ${from} au ${to}`;
+}
+
+// ===== EVENTS CRUD =====
+function openModal(name){document.getElementById('modal-'+name).classList.add('open');}
+function closeModal(name){document.getElementById('modal-'+name).classList.remove('open');}
+document.querySelectorAll('.modal-overlay').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('open');}));
+
+function openAddEventModal(prefill={}){
+  populateMoniteurSelects();
+  const sel=document.getElementById('ev-student');
+  sel.innerHTML='<option value="">— Sélectionner un élève —</option>'+students.map(s=>`<option value="${s.id}">${s.fname} ${s.lname}</option>`).join('');
+  document.getElementById('ev-id').value='';
+  document.getElementById('ev-date').value=prefill.date||today();
+  document.getElementById('ev-time').value=prefill.time||'09:00';
+  document.getElementById('ev-dur').value=prefill.dur||1;
+  if(prefill.studentId)sel.value=prefill.studentId;
+  if(prefill.type)Array.from(document.getElementById('ev-type').options).forEach(o=>{if(o.value===prefill.type)o.selected=true;});
+  document.getElementById('ev-moniteur').value=currentMoniteurId;
+  document.getElementById('modal-event-title').textContent='📅 Nouveau cours';
+  document.getElementById('ev-delete-btn').style.display='none';
+  clearErrors('ev-student','ev-date');
+  openModal('add-event');
+}
+function editEvent(id){
+  const e=events.find(x=>x.id===id);if(!e)return;
+  populateMoniteurSelects();
+  const sel=document.getElementById('ev-student');
+  sel.innerHTML=students.map(s=>`<option value="${s.id}">${s.fname} ${s.lname}</option>`).join('');
+  sel.value=e.studentId;
+  document.getElementById('ev-id').value=id;
+  document.getElementById('ev-date').value=e.date;
+  document.getElementById('ev-time').value=e.time;
+  document.getElementById('ev-dur').value=e.dur;
+  Array.from(document.getElementById('ev-type').options).forEach(o=>{if(o.value===e.type)o.selected=true;});
+  document.getElementById('ev-moniteur').value=e.moniteurId||currentMoniteurId;
+  document.getElementById('modal-event-title').textContent='✏️ Modifier le cours';
+  document.getElementById('ev-delete-btn').style.display='inline-flex';
+  clearErrors('ev-student','ev-date');
+  openModal('add-event');
+}
+function saveEvent(){
+  const sid=parseInt(document.getElementById('ev-student').value);
+  const date=document.getElementById('ev-date').value;
+  let ok=true;
+  ok=validateField('ev-student','err-ev-student',!isNaN(sid)&&sid>0)&&ok;
+  ok=validateField('ev-date','err-ev-date',!!date)&&ok;
+  if(!ok)return;
+  const type=document.getElementById('ev-type').value;
+  const dur=parseFloat(document.getElementById('ev-dur').value)||1;
+  const time=document.getElementById('ev-time').value;
+  const moniteurId=parseInt(document.getElementById('ev-moniteur').value)||currentMoniteurId;
+  const eid=document.getElementById('ev-id').value;
+  if(eid){
+    const e=events.find(x=>x.id===parseInt(eid));
+    if(e){e.studentId=sid;e.date=date;e.time=time;e.type=type;e.dur=dur;e.moniteurId=moniteurId;}
+    showToast('Cours modifié ✅');
+  }else{
+    events.push({id:nextId++,studentId:sid,date,time,type,dur,moniteurId});
+    const s=students.find(x=>x.id===sid);if(s)s.history.push({date,type,dur});
+    showToast('Cours ajouté ✅');
+  }
+  saveData();closeModal('add-event');
+  if(calView==='week')renderWeek();else renderCalendar();
+}
+function deleteEvent(){
+  const eid=parseInt(document.getElementById('ev-id').value);
+  if(!confirm('Supprimer ce cours ?'))return;
+  events=events.filter(e=>e.id!==eid);
+  saveData();closeModal('add-event');showToast('Cours supprimé');
+  if(calView==='week')renderWeek();else renderCalendar();
+}
+function confirmDeleteEvent(id){
+  if(!confirm('Supprimer ce cours ?'))return;
+  events=events.filter(e=>e.id!==id);
+  saveData();showToast('Cours supprimé');
+  if(calView==='week')renderWeek();else renderCalendar();
+}
+
+// ===== SUIVI DE SÉANCE =====
+let suiviPrefill={};
+function openSuiviModal(studentId=null){suiviPrefill={studentId};_openSuiviModal();}
+function openSuiviFromEvent(eventId){
+  const e=events.find(x=>x.id===eventId);
+  suiviPrefill=e?{studentId:e.studentId,date:e.date,type:e.type,dur:e.dur,moniteurId:e.moniteurId}:{};
+  _openSuiviModal();
+}
+function _openSuiviModal(){
+  setSuiviStep(1);populateMoniteurSelects();
+  const sel=document.getElementById('suivi-student');
+  sel.innerHTML='<option value="">— Sélectionner un élève —</option>'+students.map(s=>`<option value="${s.id}">${s.fname} ${s.lname}</option>`).join('');
+  if(suiviPrefill.studentId)sel.value=suiviPrefill.studentId;
+  document.getElementById('suivi-date').value=suiviPrefill.date||today();
+  document.getElementById('suivi-dur').value=suiviPrefill.dur||1;
+  if(suiviPrefill.type)Array.from(document.getElementById('suivi-type').options).forEach(o=>{if(o.value===suiviPrefill.type)o.selected=true;});
+  document.getElementById('suivi-moniteur-select').value=suiviPrefill.moniteurId||currentMoniteurId;
+  clearErrors('suivi-student','suivi-date','suivi-skills');
+  onSuiviStudentChange();
+  openModal('add-suivi');
+}
+function onSuiviStudentChange(){
+  const sid=parseInt(document.getElementById('suivi-student').value);
+  const s=students.find(x=>x.id===sid);
+  document.getElementById('suivi-skills-checkboxes').innerHTML=SKILLS.map(sk=>`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+      <label class="skill-check"><input type="checkbox" id="sck-${sk}" onchange="toggleSuiviSkill('${sk}')"/> ${sk}</label>
+      <div id="ssl-wrap-${sk}" style="display:none;flex:1;">
+        <select class="skill-select" id="ssl-${sk}">${LEVELS.map(l=>`<option value="${l}"${s&&s.skills[sk]===l?' selected':''}>${l}</option>`).join('')}</select>
+      </div>
+      <div style="margin-left:auto;">${s?skillBadge(s.skills[sk]):''}</div>
+    </div>`).join('');
+}
+function toggleSuiviSkill(sk){document.getElementById('ssl-wrap-'+sk).style.display=document.getElementById('sck-'+sk).checked?'flex':'none';}
+function suiviNextStep(){
+  const sid=parseInt(document.getElementById('suivi-student').value);
+  const date=document.getElementById('suivi-date').value;
+  let ok=true;
+  ok=validateField('suivi-student','err-suivi-student',!isNaN(sid)&&sid>0)&&ok;
+  ok=validateField('suivi-date','err-suivi-date',!!date)&&ok;
+  if(!ok)return;
+  setSuiviStep(2);
+}
+function suiviPrevStep(){setSuiviStep(1);}
+function setSuiviStep(n){
+  document.getElementById('suivi-step-1').classList.toggle('active',n===1);
+  document.getElementById('suivi-step-2').classList.toggle('active',n===2);
+  document.getElementById('sdot-1').classList.toggle('active',n===1);
+  document.getElementById('sdot-2').classList.toggle('active',n===2);
+}
+function saveSuivi(){
+  const sid=parseInt(document.getElementById('suivi-student').value);
+  const date=document.getElementById('suivi-date').value;
+  if(!date||!sid){showToast('Informations manquantes','error');return;}
+  const skills={};
+  SKILLS.forEach(sk=>{if(document.getElementById('sck-'+sk)?.checked){const v=document.getElementById('ssl-'+sk)?.value;if(v)skills[sk]=v;}});
+  const suivi={id:nextId++,studentId:sid,date,
+    type:document.getElementById('suivi-type').value,
+    dur:parseFloat(document.getElementById('suivi-dur').value)||1,
+    moniteurId:parseInt(document.getElementById('suivi-moniteur-select').value)||currentMoniteurId,
+    skills,
+    comportement:document.getElementById('suivi-comportement').value,
+    securite:document.getElementById('suivi-securite').value,
+    positif:document.getElementById('suivi-positif').value.trim(),
+    ameliorer:document.getElementById('suivi-ameliorer').value.trim(),
+    objectif:document.getElementById('suivi-objectif').value.trim(),
+  };
+  suivis.push(suivi);
+  if(document.getElementById('suivi-update-skills').value==='oui'){
+    const s=students.find(x=>x.id===sid);
+    if(s)Object.entries(skills).forEach(([sk,lv])=>{s.skills[sk]=lv;});
+  }
+  const s=students.find(x=>x.id===sid);
+  if(s)s.history.push({date,type:suivi.type,dur:suivi.dur});
+  saveData();closeModal('add-suivi');
+  ['suivi-positif','suivi-ameliorer','suivi-objectif'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  showToast('Fiche de séance enregistrée ✅');
+  renderSuivis();
+}
+function deleteSuivi(id,studentId){
+  if(!confirm('Supprimer cette fiche de séance ?'))return;
+  suivis=suivis.filter(f=>f.id!==id);
+  saveData();showToast('Fiche supprimée');
+  if(studentId)openStudentDetail(studentId);else renderSuivis();
+}
+function renderSuivis(){
+  const filterM=document.getElementById('filter-suivi-moniteur').value;
+  populateMoniteurSelects();
+  document.getElementById('filter-suivi-moniteur').value=filterM;
+  const fs=document.getElementById('filter-suivi-student');
+  const cur=fs.value;
+  fs.innerHTML='<option value="">Tous les élèves</option>'+students.map(s=>`<option value="${s.id}"${cur==s.id?' selected':''}>${s.fname} ${s.lname}</option>`).join('');
+  const filterSid=fs.value;
+  const filterType=document.getElementById('filter-suivi-type').value;
+  let list=[...suivis].sort((a,b)=>b.date.localeCompare(a.date));
+  if(filterSid)list=list.filter(f=>f.studentId==filterSid);
+  if(filterType)list=list.filter(f=>f.type===filterType);
+  if(filterM)list=list.filter(f=>f.moniteurId==filterM);
+  const el=document.getElementById('suivis-list');
+  if(!list.length){el.innerHTML='<div class="card" style="text-align:center;color:var(--muted);padding:32px;">Aucune fiche de séance.</div>';return;}
+  el.innerHTML=list.map(f=>{
+    const s=students.find(x=>x.id===f.studentId);const c=COLORS[(s?s.id:0)%COLORS.length];
+    const skEntries=Object.entries(f.skills||{});
+    return`<div class="card" style="margin-bottom:14px;">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div class="avatar" style="background:${c}20;color:${c};width:36px;height:36px;font-size:.84rem;">${s?s.fname[0]+s.lname[0]:'?'}</div>
+          <div><div style="font-weight:600;font-size:.88rem;">${s?s.fname+' '+s.lname:'Inconnu'}</div>
+          <div style="font-size:.74rem;color:var(--muted);">${f.date} · ${f.type} · ${f.dur}h · <span class="moniteur-badge">${moniteurName(f.moniteurId)}</span></div></div>
+        </div>
+        <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap;">
+          <span style="font-size:.84rem;">${f.comportement}</span>
+          <span style="font-size:.79rem;padding:3px 8px;border-radius:99px;background:${f.securite.includes('✅')?'rgba(16,185,129,.15)':f.securite.includes('⚠️')?'rgba(245,158,11,.15)':'rgba(244,63,94,.15)'};color:${f.securite.includes('✅')?'var(--success)':f.securite.includes('⚠️')?'var(--warning)':'var(--danger)'};">${f.securite}</span>
+          <button class="btn btn-danger btn-sm" onclick="deleteSuivi(${f.id},null)">🗑</button>
+        </div>
+      </div>
+      ${skEntries.length?`<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;">`+skEntries.map(([sk,lv])=>`<span style="font-size:.73rem;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:3px 8px;color:var(--muted);">${sk} → ${skillBadge(lv)}</span>`).join('')+`</div>`:''}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:.8rem;">
+        ${f.positif?`<div style="background:rgba(16,185,129,.07);border-radius:8px;padding:9px 11px;border-left:3px solid var(--success);"><div style="font-size:.69rem;color:var(--success);font-weight:600;margin-bottom:3px;">✅ POINTS POSITIFS</div>${f.positif}</div>`:''}
+        ${f.ameliorer?`<div style="background:rgba(245,158,11,.07);border-radius:8px;padding:9px 11px;border-left:3px solid var(--warning);"><div style="font-size:.69rem;color:var(--warning);font-weight:600;margin-bottom:3px;">⚠️ À TRAVAILLER</div>${f.ameliorer}</div>`:''}
+      </div>
+      ${f.objectif?`<div style="margin-top:10px;background:rgba(99,102,241,.07);border-radius:8px;padding:9px 11px;border-left:3px solid var(--accent2);font-size:.8rem;"><span style="font-size:.69rem;color:var(--accent2);font-weight:600;">🎯 OBJECTIF &nbsp;</span>${f.objectif}</div>`:''}
+    </div>`;
+  }).join('');
+}
+
+// ===== STATS =====
+const SC={};
+function renderStats(){
+  const passed=students.filter(s=>s.exam==='Réussi').length;
+  document.getElementById('stat-rate').textContent=students.length?Math.round(passed/students.length*100)+'%':'—';
+  document.getElementById('stat-suivis').textContent=suivis.length;
+  document.getElementById('stat-events').textContent=events.length;
+  const sel=document.getElementById('stats-student-select');
+  sel.innerHTML=students.map(s=>`<option value="${s.id}">${s.fname} ${s.lname}</option>`).join('');
+  const tc=darkMode?'#94a3b8':'#64748b';const gc=darkMode?'#2e3248':'#e2e8f0';const lc=darkMode?'#f1f5f9':'#1e293b';
+  if(SC.radar)SC.radar.destroy();
+  SC.radar=new Chart(document.getElementById('skillRadar').getContext('2d'),{type:'radar',data:{labels:SKILLS,datasets:[{label:'Niveau moyen',data:SKILLS.map(sk=>Math.round(students.reduce((a,s)=>a+LEVEL_VAL[s.skills[sk]],0)/students.length*25)),backgroundColor:'rgba(249,115,22,.15)',borderColor:'#f97316',pointBackgroundColor:'#f97316'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:tc}}},scales:{r:{ticks:{color:tc,backdropColor:'transparent',callback:v=>['','Débutant','En prog.','Acquis','Maîtrisé'][v/25]||''},grid:{color:gc},pointLabels:{color:lc,font:{size:11}},min:0,max:100}}}});
+  if(SC.enroll)SC.enroll.destroy();
+  const enrollMonths=[];const enrollCounts=[];
+  for(let i=5;i>=0;i--){const d=new Date();d.setMonth(d.getMonth()-i);const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;enrollMonths.push(d.toLocaleDateString('fr-FR',{month:'short'}));enrollCounts.push(events.filter(e=>e.date.startsWith(key)).length);}
+  renderStudentEvolution();
+}
+function renderStudentEvolution(){
+  const id=parseInt(document.getElementById('stats-student-select').value);
+  const s=students.find(x=>x.id===id);if(!s)return;
+  if(SC.evolution)SC.evolution.destroy();
+  const col=COLORS[s.id%COLORS.length];
+  const tc=darkMode?'#94a3b8':'#64748b';const gc=darkMode?'#2e3248':'#e2e8f0';
+  const sFiches=[...suivis.filter(f=>f.studentId===id)].sort((a,b)=>a.date.localeCompare(b.date));
+  let labels=[],data=[];
+  if(sFiches.length>=2){
+    const snapshot={...s.skills};
+    sFiches.forEach(f=>{
+      Object.entries(f.skills||{}).forEach(([sk,lv])=>{snapshot[sk]=lv;});
+      const avg=Math.round(Object.values(snapshot).reduce((a,b)=>a+LEVEL_VAL[b],0)/SKILLS.length);
+      labels.push(f.date.slice(5));data.push(avg);
+    });
+    data.push(avgSkillVal(s));labels.push('Auj.');
+  }else{
+    const base=avgSkillVal(s);
+    labels=['Oct','Nov','Déc','Jan','Fév','Mar'];
+    data=labels.map((_,i)=>Math.max(1,Math.min(4,Math.round(base-(labels.length-1-i)*0.5))));
+    data[data.length-1]=base;
+  }
+  SC.evolution=new Chart(document.getElementById('evolutionChart').getContext('2d'),{type:'line',data:{labels,datasets:[{label:s.fname+' '+s.lname,data,borderColor:col,backgroundColor:col+'22',tension:.4,fill:true,pointBackgroundColor:col,pointRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:tc}}},scales:{x:{ticks:{color:tc,maxRotation:45},grid:{color:gc}},y:{min:0.5,max:4.5,ticks:{color:tc,callback:v=>({1:'Débutant',2:'En progression',3:'Acquis',4:'Maîtrisé'})[v]||'',stepSize:1},grid:{color:gc}}}}});
+}
+
+// ===== CHARTS =====
+const CI={};
+function renderDonut(id,labels,data,colors){
+  if(CI[id])CI[id].destroy();
+  const tc=darkMode?'#94a3b8':'#64748b';
+  CI[id]=new Chart(document.getElementById(id).getContext('2d'),{type:'doughnut',data:{labels,datasets:[{data,backgroundColor:colors,borderWidth:0,hoverOffset:5}]},options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{position:'right',labels:{color:tc,font:{size:10},boxWidth:10}}}}});
+}
+function renderLine(id,labels,data){
+  if(CI[id])CI[id].destroy();
+  const tc=darkMode?'#94a3b8':'#64748b';const gc=darkMode?'#2e3248':'#e2e8f0';
+  CI[id]=new Chart(document.getElementById(id).getContext('2d'),{type:'line',data:{labels,datasets:[{data,borderColor:'#f97316',backgroundColor:'rgba(249,115,22,.1)',tension:.4,fill:true,pointBackgroundColor:'#f97316'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:tc},grid:{color:gc}},y:{ticks:{color:tc},grid:{color:gc}}}}});
+}
+
+// ===== STUDENTS CRUD =====
+function addStudent(){
+  const fname=document.getElementById('new-fname').value.trim();
+  const lname=document.getElementById('new-lname').value.trim();
+  let ok=true;
+  ok=validateField('new-fname','err-fname',!!fname)&&ok;
+  ok=validateField('new-lname','err-lname',!!lname)&&ok;
+  if(!ok)return;
+  const moniteurId=parseInt(document.getElementById('new-moniteur-assign').value)||currentMoniteurId;
+  students.push({id:nextId++,fname,lname,phone:document.getElementById('new-phone').value||'—',hours:parseInt(document.getElementById('new-hours').value)||0,exam:document.getElementById('new-exam').value,comment:'',moniteurId,skills:{Freinage:'Débutant',Virage:'Débutant',Maniabilité:'Débutant',Équilibre:'Débutant',Signalisation:'Débutant',Vitesse:'Débutant'},history:[]});
+  saveData();closeModal('add-student');
+  ['new-fname','new-lname','new-phone'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('new-hours').value=0;
+  showToast('Élève ajouté ✅');renderDashboard();
+}
+
+// ===== SEARCH =====
+function globalSearch(q){
+  if(q.length>1){showPage('students',document.querySelectorAll('.nav-item')[1]);renderStudentsTable();}
+}
+
+// ===== INIT =====
+loadData();
+populateMoniteurSelects();
+updateMoniteurLabel();
+updateStorageInfo();
+
+// Lien "Gérer les moniteurs" dans sidebar
+document.querySelector('.sidebar-footer').insertAdjacentHTML('afterbegin',
+  `<button class="btn btn-ghost btn-sm" style="width:100%;margin-bottom:6px;text-align:left;" onclick="openManageMoniteurs()">👥 Moniteurs</button>`
+);
+function openManageMoniteurs(){renderMoniteursList();openModal('moniteurs');}
+
+renderDashboard();
+</script>
+</body>
+</html>
