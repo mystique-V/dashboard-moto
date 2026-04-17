@@ -161,6 +161,16 @@ tr:hover td{background:rgba(128,128,128,.04);}
 /* SEARCH */
 .search-bar{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:7px 11px;color:var(--text);font-size:.82rem;outline:none;}
 .search-bar:focus{border-color:var(--accent);}
+.search-wrapper{position:relative;}
+.search-results{display:none;position:absolute;top:calc(100% + 4px);right:0;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.35);min-width:260px;max-width:340px;max-height:360px;overflow-y:auto;z-index:1000;}
+.search-results.open{display:block;}
+.search-result-item{padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:2px;}
+.search-result-item:last-child{border-bottom:none;}
+.search-result-item:hover,.search-result-item.active{background:var(--card);}
+.search-result-name{font-size:.86rem;font-weight:500;color:var(--text);}
+.search-result-meta{font-size:.72rem;color:var(--muted);}
+.search-results-empty{padding:16px 12px;text-align:center;font-size:.78rem;color:var(--muted);}
+.search-results-header{padding:6px 12px;font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);background:var(--card);border-bottom:1px solid var(--border);}
 /* CHARTS */
 .chart-wrap{position:relative;height:185px;}
 .chart-wrap-lg{position:relative;height:220px;}
@@ -226,7 +236,10 @@ tr:hover td{background:rgba(128,128,128,.04);}
         <h1 id="page-title">Tableau de bord</h1>
       </div>
       <div class="topbar-right">
-        <input class="search-bar" placeholder="🔍 Rechercher…" id="global-search" oninput="globalSearch(this.value)" style="width:165px;"/>
+        <div class="search-wrapper">
+          <input class="search-bar" placeholder="🔍 Rechercher un élève…" id="global-search" oninput="globalSearch(this.value)" onkeydown="globalSearchKey(event)" onfocus="globalSearch(this.value)" autocomplete="off" style="width:200px;"/>
+          <div class="search-results" id="search-results" role="listbox"></div>
+        </div>
         <button class="theme-toggle" onclick="toggleTheme()" id="theme-btn" title="Thème">🌙</button>
         <button class="btn btn-primary" onclick="openModal('add-student')">+ Nouvel Élève</button>
       </div>
@@ -1278,8 +1291,74 @@ function addStudent(){
 }
 
 // ===== SEARCH =====
+// Index courant dans les résultats (pour navigation clavier)
+let searchActiveIdx=-1;
+
 function globalSearch(q){
-  if(q.length>1){showPage('students',document.querySelectorAll('.nav-item')[1]);renderStudentsTable();}
+  // Si on est sur la page Élèves, on garde aussi le filtrage du tableau
+  if(document.getElementById('page-students').classList.contains('active')){
+    renderStudentsTable();
+  }
+  const box=document.getElementById('search-results');
+  const query=(q||'').trim().toLowerCase();
+  // Moins de 2 caractères → on cache le dropdown
+  if(query.length<2){box.classList.remove('open');box.innerHTML='';searchActiveIdx=-1;return;}
+  // Recherche : nom, prénom, téléphone
+  const matches=students.filter(s=>
+    (s.fname+' '+s.lname).toLowerCase().includes(query)||
+    (s.lname+' '+s.fname).toLowerCase().includes(query)||
+    (s.phone||'').toLowerCase().includes(query)
+  ).slice(0,8); // max 8 résultats
+  if(matches.length===0){
+    box.innerHTML=`<div class="search-results-empty">Aucun élève pour "${escapeHtml(q)}"</div>`;
+  }else{
+    const header=`<div class="search-results-header">${matches.length} élève${matches.length>1?'s':''}</div>`;
+    const items=matches.map((s,i)=>{
+      const mono=moniteurs.find(m=>m.id===s.moniteurId);
+      return `<div class="search-result-item" data-id="${s.id}" onclick="openStudentFromSearch(${s.id})">
+        <div class="search-result-name">${escapeHtml(s.fname)} ${escapeHtml(s.lname)}</div>
+        <div class="search-result-meta">${escapeHtml(s.phone||'—')} · ${escapeHtml(s.exam)}${mono?' · '+escapeHtml(mono.name):''}</div>
+      </div>`;
+    }).join('');
+    box.innerHTML=header+items;
+  }
+  box.classList.add('open');
+  searchActiveIdx=-1;
+}
+
+function globalSearchKey(e){
+  const box=document.getElementById('search-results');
+  const items=box.querySelectorAll('.search-result-item');
+  if(e.key==='Escape'){box.classList.remove('open');e.target.blur();return;}
+  if(!items.length)return;
+  if(e.key==='ArrowDown'){e.preventDefault();searchActiveIdx=(searchActiveIdx+1)%items.length;}
+  else if(e.key==='ArrowUp'){e.preventDefault();searchActiveIdx=(searchActiveIdx-1+items.length)%items.length;}
+  else if(e.key==='Enter' && searchActiveIdx>=0){
+    e.preventDefault();
+    const id=parseInt(items[searchActiveIdx].dataset.id);
+    openStudentFromSearch(id);
+    return;
+  }else return;
+  items.forEach((it,i)=>it.classList.toggle('active',i===searchActiveIdx));
+  items[searchActiveIdx]?.scrollIntoView({block:'nearest'});
+}
+
+function openStudentFromSearch(id){
+  document.getElementById('search-results').classList.remove('open');
+  document.getElementById('global-search').value='';
+  searchActiveIdx=-1;
+  openStudentDetail(id);
+}
+
+// Fermer le dropdown quand on clique en dehors
+document.addEventListener('click',e=>{
+  const wrapper=e.target.closest('.search-wrapper');
+  if(!wrapper){document.getElementById('search-results')?.classList.remove('open');}
+});
+
+// Utilitaire : échapper le HTML pour éviter les injections dans les noms
+function escapeHtml(str){
+  return String(str??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
 }
 
 // ===== INIT =====
