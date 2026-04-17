@@ -27,14 +27,14 @@
   "screenshots": [
     {
       "src": "screenshot-desktop.png",
-      "sizes": "1280x720",
+      "sizes": "2880x1522",
       "type": "image/png",
       "form_factor": "wide",
       "label": "Tableau de bord - vue ordinateur"
     },
     {
       "src": "screenshot-mobile.jpg",
-      "sizes": "390x844",
+      "sizes": "1080x2120",
       "type": "image/jpeg",
       "form_factor": "narrow",
       "label": "Tableau de bord - vue mobile"
