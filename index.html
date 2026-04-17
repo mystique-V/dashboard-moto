@@ -76,6 +76,12 @@ tr:hover td{background:rgba(128,128,128,.04);}
 .tag-blue{background:rgba(99,102,241,.15);color:var(--accent2);}
 .tag-red{background:rgba(244,63,94,.15);color:var(--danger);}
 .ready-badge{background:rgba(16,185,129,.2);color:var(--success);border:1px solid rgba(16,185,129,.4);padding:3px 8px;border-radius:99px;font-size:.7rem;font-weight:700;}
+/* Badges "Type de permis" (AM / A1 / A2 / A) — petite pastille colorée compacte */
+.permis-badge{display:inline-block;font-size:.65rem;font-weight:800;padding:2px 7px;border-radius:5px;color:#fff;letter-spacing:.5px;line-height:1.4;vertical-align:middle;}
+.permis-AM{background:#64748b;}       /* gris — scooter 50cc */
+.permis-A1{background:#3b82f6;}       /* bleu — 125cc */
+.permis-A2{background:#f97316;}       /* orange — permis moto limité (le plus courant) */
+.permis-A{background:#ef4444;}        /* rouge — permis moto complet */
 /* SKILLS */
 .skill-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;font-size:.8rem;}
 .skill-name{width:115px;color:var(--muted);flex-shrink:0;}
@@ -282,6 +288,10 @@ tr:hover td{background:rgba(128,128,128,.04);}
             <option value="">Tous les statuts</option>
             <option>En formation</option><option>Examen planifié</option><option>Réussi</option><option>Échoué</option>
           </select>
+          <select class="search-bar" id="filter-permis" onchange="renderStudentsTable()" style="width:auto;">
+            <option value="">Tous les permis</option>
+            <option value="AM">AM</option><option value="A1">A1</option><option value="A2">A2</option><option value="A">A</option>
+          </select>
           <select class="search-bar" id="filter-moniteur" onchange="renderStudentsTable()" style="width:auto;">
             <option value="">Tous les moniteurs</option>
           </select>
@@ -394,8 +404,14 @@ tr:hover td{background:rgba(128,128,128,.04);}
     </div>
     <div class="form-row">
       <div class="form-group"><label>Statut examen</label><select id="new-exam"><option>En formation</option><option>Examen planifié</option><option>Réussi</option><option>Échoué</option></select></div>
-      <div class="form-group"><label>Moniteur référent</label><select id="new-moniteur-assign" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 11px;color:var(--text);font-size:.84rem;outline:none;"></select></div>
+      <div class="form-group"><label>Type de permis</label><select id="new-permis">
+        <option value="AM">AM — Scooter 50cc (14 ans+)</option>
+        <option value="A1">A1 — Moto légère 125cc (16 ans+)</option>
+        <option value="A2" selected>A2 — Permis moto limité (18 ans+)</option>
+        <option value="A">A — Permis moto complet</option>
+      </select></div>
     </div>
+    <div class="form-group"><label>Moniteur référent</label><select id="new-moniteur-assign" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 11px;color:var(--text);font-size:.84rem;outline:none;"></select></div>
     <div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal('add-student')">Annuler</button><button class="btn btn-primary" onclick="addStudent()">Ajouter</button></div>
   </div>
 </div>
@@ -492,8 +508,14 @@ tr:hover td{background:rgba(128,128,128,.04);}
     </div>
     <div class="form-row">
       <div class="form-group"><label>Statut examen</label><select id="edit-exam"><option>En formation</option><option>Examen planifié</option><option>Réussi</option><option>Échoué</option></select></div>
-      <div class="form-group"><label>Moniteur référent</label><select id="edit-moniteur-assign" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 11px;color:var(--text);font-size:.84rem;outline:none;"></select></div>
+      <div class="form-group"><label>Type de permis</label><select id="edit-permis">
+        <option value="AM">AM — Scooter 50cc (14 ans+)</option>
+        <option value="A1">A1 — Moto légère 125cc (16 ans+)</option>
+        <option value="A2">A2 — Permis moto limité (18 ans+)</option>
+        <option value="A">A — Permis moto complet</option>
+      </select></div>
     </div>
+    <div class="form-group"><label>Moniteur référent</label><select id="edit-moniteur-assign" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 11px;color:var(--text);font-size:.84rem;outline:none;"></select></div>
     <div class="form-group"><label>Commentaire / objectifs</label><textarea id="edit-comment" placeholder="Remarques libres…"></textarea></div>
     <div class="section-label">Compétences</div>
     <div id="edit-skills-inputs"></div>
@@ -568,14 +590,14 @@ let moniteurs=[
   {id:2,name:'Marie'},
 ];
 let students=[
-  {id:1,fname:'Kévin',lname:'Moreau',phone:'0692 11 22 33',hours:18,exam:'Réussi',comment:'Élève sérieux.',moniteurId:1,skills:{Freinage:'Maîtrisé',Virage:'Acquis',Maniabilité:'Acquis',Équilibre:'Maîtrisé',Signalisation:'Acquis',Vitesse:'Acquis'},history:[{date:nextDate(-20),type:'Conduite sur circuit',dur:1},{date:nextDate(-15),type:'Freinage d\'urgence',dur:1.5}]},
-  {id:2,fname:'Léa',lname:'Bernard',phone:'0693 44 55 66',hours:12,exam:'Examen planifié',comment:'',moniteurId:1,skills:{Freinage:'Acquis',Virage:'En progression',Maniabilité:'En progression',Équilibre:'Acquis',Signalisation:'En progression',Vitesse:'En progression'},history:[{date:nextDate(-22),type:'Maniabilité',dur:1}]},
-  {id:3,fname:'Théo',lname:'Martin',phone:'0692 77 88 99',hours:8,exam:'En formation',comment:'Débutant motivé.',moniteurId:2,skills:{Freinage:'En progression',Virage:'Débutant',Maniabilité:'En progression',Équilibre:'Débutant',Signalisation:'En progression',Vitesse:'Débutant'},history:[{date:nextDate(-12),type:'Cours théorique',dur:1}]},
-  {id:4,fname:'Amina',lname:'Ousseni',phone:'0693 12 34 56',hours:22,exam:'Réussi',comment:'Excellente élève.',moniteurId:2,skills:{Freinage:'Maîtrisé',Virage:'Maîtrisé',Maniabilité:'Maîtrisé',Équilibre:'Maîtrisé',Signalisation:'Acquis',Vitesse:'Maîtrisé'},history:[{date:nextDate(-30),type:'Autoroute',dur:2}]},
-  {id:5,fname:'Jordan',lname:'Hoarau',phone:'0692 98 76 54',hours:5,exam:'En formation',comment:'',moniteurId:1,skills:{Freinage:'Débutant',Virage:'Débutant',Maniabilité:'Débutant',Équilibre:'Débutant',Signalisation:'En progression',Vitesse:'Débutant'},history:[]},
-  {id:6,fname:'Camille',lname:'Grondin',phone:'0693 65 43 21',hours:15,exam:'Échoué',comment:'Retravailler freinage.',moniteurId:2,skills:{Freinage:'En progression',Virage:'En progression',Maniabilité:'Acquis',Équilibre:'En progression',Signalisation:'Acquis',Vitesse:'En progression'},history:[{date:nextDate(-8),type:'Freinage d\'urgence',dur:1.5}]},
-  {id:7,fname:'Yannick',lname:'Payet',phone:'0692 55 44 33',hours:20,exam:'Examen planifié',comment:'',moniteurId:1,skills:{Freinage:'Acquis',Virage:'Maîtrisé',Maniabilité:'Acquis',Équilibre:'Acquis',Signalisation:'Acquis',Vitesse:'Acquis'},history:[{date:nextDate(-5),type:'Autoroute',dur:2}]},
-  {id:8,fname:'Sonia',lname:'Fontaine',phone:'0693 22 11 00',hours:10,exam:'En formation',comment:'',moniteurId:2,skills:{Freinage:'En progression',Virage:'En progression',Maniabilité:'En progression',Équilibre:'En progression',Signalisation:'Acquis',Vitesse:'En progression'},history:[{date:nextDate(-14),type:'Maniabilité',dur:1}]},
+  {id:1,fname:'Kévin',lname:'Moreau',phone:'0692 11 22 33',hours:18,exam:'Réussi',permis:'A2',comment:'Élève sérieux.',moniteurId:1,skills:{Freinage:'Maîtrisé',Virage:'Acquis',Maniabilité:'Acquis',Équilibre:'Maîtrisé',Signalisation:'Acquis',Vitesse:'Acquis'},history:[{date:nextDate(-20),type:'Conduite sur circuit',dur:1},{date:nextDate(-15),type:'Freinage d\'urgence',dur:1.5}]},
+  {id:2,fname:'Léa',lname:'Bernard',phone:'0693 44 55 66',hours:12,exam:'Examen planifié',permis:'A2',comment:'',moniteurId:1,skills:{Freinage:'Acquis',Virage:'En progression',Maniabilité:'En progression',Équilibre:'Acquis',Signalisation:'En progression',Vitesse:'En progression'},history:[{date:nextDate(-22),type:'Maniabilité',dur:1}]},
+  {id:3,fname:'Théo',lname:'Martin',phone:'0692 77 88 99',hours:8,exam:'En formation',permis:'A1',comment:'Débutant motivé.',moniteurId:2,skills:{Freinage:'En progression',Virage:'Débutant',Maniabilité:'En progression',Équilibre:'Débutant',Signalisation:'En progression',Vitesse:'Débutant'},history:[{date:nextDate(-12),type:'Cours théorique',dur:1}]},
+  {id:4,fname:'Amina',lname:'Ousseni',phone:'0693 12 34 56',hours:22,exam:'Réussi',permis:'A',comment:'Excellente élève.',moniteurId:2,skills:{Freinage:'Maîtrisé',Virage:'Maîtrisé',Maniabilité:'Maîtrisé',Équilibre:'Maîtrisé',Signalisation:'Acquis',Vitesse:'Maîtrisé'},history:[{date:nextDate(-30),type:'Autoroute',dur:2}]},
+  {id:5,fname:'Jordan',lname:'Hoarau',phone:'0692 98 76 54',hours:5,exam:'En formation',permis:'AM',comment:'',moniteurId:1,skills:{Freinage:'Débutant',Virage:'Débutant',Maniabilité:'Débutant',Équilibre:'Débutant',Signalisation:'En progression',Vitesse:'Débutant'},history:[]},
+  {id:6,fname:'Camille',lname:'Grondin',phone:'0693 65 43 21',hours:15,exam:'Échoué',permis:'A2',comment:'Retravailler freinage.',moniteurId:2,skills:{Freinage:'En progression',Virage:'En progression',Maniabilité:'Acquis',Équilibre:'En progression',Signalisation:'Acquis',Vitesse:'En progression'},history:[{date:nextDate(-8),type:'Freinage d\'urgence',dur:1.5}]},
+  {id:7,fname:'Yannick',lname:'Payet',phone:'0692 55 44 33',hours:20,exam:'Examen planifié',permis:'A',comment:'',moniteurId:1,skills:{Freinage:'Acquis',Virage:'Maîtrisé',Maniabilité:'Acquis',Équilibre:'Acquis',Signalisation:'Acquis',Vitesse:'Acquis'},history:[{date:nextDate(-5),type:'Autoroute',dur:2}]},
+  {id:8,fname:'Sonia',lname:'Fontaine',phone:'0693 22 11 00',hours:10,exam:'En formation',permis:'A1',comment:'',moniteurId:2,skills:{Freinage:'En progression',Virage:'En progression',Maniabilité:'En progression',Équilibre:'En progression',Signalisation:'Acquis',Vitesse:'En progression'},history:[{date:nextDate(-14),type:'Maniabilité',dur:1}]},
 ];
 let events=[
   {id:1,studentId:1,date:today(),time:'09:00',type:'Conduite sur circuit',dur:1,moniteurId:1},
@@ -645,6 +667,9 @@ function loadData(){
       else if(p.nextId)nextIds={students:p.nextId,events:p.nextId,suivis:p.nextId,moniteurs:p.nextId};
       currentMoniteurId=p.currentMoniteurId||currentMoniteurId;
     }
+    // Migration : les élèves enregistrés avant l'ajout du champ "permis"
+    // n'ont pas de valeur. On leur attribue 'A2' par défaut (permis le plus courant).
+    students.forEach(s=>{if(!['AM','A1','A2','A'].includes(s.permis))s.permis='A2';});
   }catch(e){console.warn('Load failed',e);}
 }
 function updateStorageInfo(){
@@ -691,7 +716,7 @@ window.addEventListener('beforeunload',e=>{
 
 // ===== EXPORT / IMPORT =====
 function exportData(){
-  const data={version:3,exported:new Date().toISOString(),students,events,suivis,moniteurs,nextIds};
+  const data={version:4,exported:new Date().toISOString(),students,events,suivis,moniteurs,nextIds};
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
@@ -712,6 +737,8 @@ function importData(event){
       moniteurs=d.moniteurs||moniteurs;
       if(d.nextIds)nextIds=d.nextIds;
       else if(d.nextId)nextIds={students:d.nextId,events:d.nextId,suivis:d.nextId,moniteurs:d.nextId};
+      // Migration permis : fichier exporté avant la v4 → pas de champ permis → défaut A2
+      students.forEach(s=>{if(!['AM','A1','A2','A'].includes(s.permis))s.permis='A2';});
       saveData();renderDashboard();
       showToast(`Import réussi : ${students.length} élèves ✅`);
     }catch(err){showToast('Fichier invalide ou corrompu','error');}
@@ -893,7 +920,7 @@ function renderDashboard(){
   // Recent students
   document.getElementById('recent-students-table').innerHTML=students.slice(0,5).map(s=>{
     const c=COLORS[s.id%COLORS.length];
-    return`<tr><td><div class="student-name"><div class="avatar" style="background:${c}20;color:${c}">${s.fname[0]+s.lname[0]}</div>${s.fname} ${s.lname}${isReadyForExam(s)&&s.exam!=='Réussi'?'<span class="ready-badge" style="margin-left:5px;">Prêt</span>':''}</div></td><td>${s.hours}h</td><td>${skillBadge(avgSkillLabel(s))}</td><td><span class="tag ${examTag(s.exam)}">${s.exam}</span></td></tr>`;
+    return`<tr><td><div class="student-name"><div class="avatar" style="background:${c}20;color:${c}">${s.fname[0]+s.lname[0]}</div>${s.fname} ${s.lname} ${permisBadge(s.permis)}${isReadyForExam(s)&&s.exam!=='Réussi'?'<span class="ready-badge" style="margin-left:5px;">Prêt</span>':''}</div></td><td>${s.hours}h</td><td>${skillBadge(avgSkillLabel(s))}</td><td><span class="tag ${examTag(s.exam)}">${s.exam}</span></td></tr>`;
   }).join('');
   updateStorageInfo();
 }
@@ -909,11 +936,13 @@ function sortStudents(col){
 }
 function renderStudentsTable(){
   const filter=document.getElementById('filter-exam').value;
+  const filterP=document.getElementById('filter-permis').value;
   const filterM=document.getElementById('filter-moniteur').value;
   populateMoniteurSelects();
   document.getElementById('filter-moniteur').value=filterM;
   const q=normSearch(document.getElementById('global-search').value);
   let list=filter?students.filter(s=>s.exam===filter):[...students];
+  if(filterP)list=list.filter(s=>(s.permis||'A2')===filterP);
   if(filterM)list=list.filter(s=>s.moniteurId==filterM);
   if(q)list=list.filter(s=>normSearch(s.fname+' '+s.lname).includes(q)||normSearch(s.phone||'').includes(q));
   if(sortState.col){
@@ -929,7 +958,7 @@ function renderStudentsTable(){
   document.getElementById('students-table').innerHTML=list.map(s=>{
     const c=COLORS[s.id%COLORS.length];const ready=isReadyForExam(s)&&s.exam!=='Réussi';
     return`<tr>
-      <td><div class="student-name"><div class="avatar" style="background:${c}20;color:${c}">${s.fname[0]+s.lname[0]}</div>${s.fname} ${s.lname}${ready?'<span class="ready-badge" style="margin-left:5px;">Prêt</span>':''}</div></td>
+      <td><div class="student-name"><div class="avatar" style="background:${c}20;color:${c}">${s.fname[0]+s.lname[0]}</div>${s.fname} ${s.lname} ${permisBadge(s.permis)}${ready?'<span class="ready-badge" style="margin-left:5px;">Prêt</span>':''}</div></td>
       <td style="color:var(--muted)">${s.phone}</td><td>${s.hours}h</td>
       <td>${skillBadge(avgSkillLabel(s))}</td>
       <td><span class="tag ${examTag(s.exam)}">${s.exam}</span></td>
@@ -951,7 +980,7 @@ function openStudentDetail(id){
     <div class="detail-header">
       <div class="detail-avatar" style="background:${c}20;color:${c}">${s.fname[0]+s.lname[0]}</div>
       <div class="detail-info">
-        <h2>${s.fname} ${s.lname} ${ready?'<span class="ready-badge">🏆 Prêt pour l\'examen</span>':''}</h2>
+        <h2>${s.fname} ${s.lname} ${permisBadge(s.permis)} ${ready?'<span class="ready-badge">🏆 Prêt pour l\'examen</span>':''}</h2>
         <p>${s.phone} &nbsp;·&nbsp; <span class="tag ${examTag(s.exam)}">${s.exam}</span> &nbsp;·&nbsp; <span class="moniteur-badge">👤 ${moniteurName(s.moniteurId)}</span></p>
         ${s.comment?`<p style="margin-top:5px;font-style:italic;font-size:.8rem;color:var(--muted)">${s.comment}</p>`:''}
       </div>
@@ -998,6 +1027,8 @@ function openEditModal(id){
   document.getElementById('edit-phone').value=s.phone;
   document.getElementById('edit-hours').value=s.hours;
   document.getElementById('edit-exam').value=s.exam;
+  // Permis : si l'élève n'en a pas encore (données anciennes), on affiche A2 par défaut
+  document.getElementById('edit-permis').value=PERMIS_VALUES.includes(s.permis)?s.permis:'A2';
   document.getElementById('edit-comment').value=s.comment||'';
   document.getElementById('edit-moniteur-assign').value=s.moniteurId||currentMoniteurId;
   document.getElementById('edit-skills-inputs').innerHTML=SKILLS.map(sk=>`
@@ -1018,6 +1049,8 @@ function saveEditStudent(){
   s.phone=document.getElementById('edit-phone').value||s.phone;
   s.hours=parseInt(document.getElementById('edit-hours').value)||s.hours;
   s.exam=document.getElementById('edit-exam').value;
+  const permisRaw=document.getElementById('edit-permis').value;
+  s.permis=PERMIS_VALUES.includes(permisRaw)?permisRaw:(s.permis||'A2');
   s.comment=document.getElementById('edit-comment').value;
   s.moniteurId=parseInt(document.getElementById('edit-moniteur-assign').value)||s.moniteurId;
   SKILLS.forEach(sk=>{const v=document.getElementById('ep-'+sk).value;if(LEVELS.includes(v))s.skills[sk]=v;});
@@ -1403,6 +1436,14 @@ function renderLine(id,labels,data){
 }
 
 // ===== STUDENTS CRUD =====
+// Liste blanche des types de permis acceptés — évite qu'une valeur bizarre ne casse l'affichage.
+const PERMIS_VALUES=['AM','A1','A2','A'];
+// Petit badge coloré pour le type de permis. Tolère les anciens élèves sans champ → fallback 'A2'.
+function permisBadge(p){
+  const v=PERMIS_VALUES.includes(p)?p:'A2';
+  return`<span class="permis-badge permis-${v}">${v}</span>`;
+}
+
 function addStudent(){
   const fname=document.getElementById('new-fname').value.trim();
   const lname=document.getElementById('new-lname').value.trim();
@@ -1411,10 +1452,13 @@ function addStudent(){
   ok=validateField('new-lname','err-lname',!!lname)&&ok;
   if(!ok)return;
   const moniteurId=parseInt(document.getElementById('new-moniteur-assign').value)||currentMoniteurId;
-  students.push({id:nouvelId('students'),fname,lname,phone:document.getElementById('new-phone').value||'—',hours:parseInt(document.getElementById('new-hours').value)||0,exam:document.getElementById('new-exam').value,comment:'',moniteurId,skills:{Freinage:'Débutant',Virage:'Débutant',Maniabilité:'Débutant',Équilibre:'Débutant',Signalisation:'Débutant',Vitesse:'Débutant'},history:[]});
+  const permisRaw=document.getElementById('new-permis').value;
+  const permis=PERMIS_VALUES.includes(permisRaw)?permisRaw:'A2';
+  students.push({id:nouvelId('students'),fname,lname,phone:document.getElementById('new-phone').value||'—',hours:parseInt(document.getElementById('new-hours').value)||0,exam:document.getElementById('new-exam').value,permis,comment:'',moniteurId,skills:{Freinage:'Débutant',Virage:'Débutant',Maniabilité:'Débutant',Équilibre:'Débutant',Signalisation:'Débutant',Vitesse:'Débutant'},history:[]});
   saveData();closeModal('add-student');
   ['new-fname','new-lname','new-phone'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('new-hours').value=0;
+  document.getElementById('new-permis').value='A2';
   showToast('Élève ajouté ✅');renderDashboard();
 }
 
