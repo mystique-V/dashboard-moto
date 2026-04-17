@@ -10,7 +10,7 @@
 
 // Version du cache : change ce numéro quand tu modifies ton app
 // pour forcer le rafraîchissement chez tes utilisateurs.
-const CACHE_VERSION = 'moto-ecole-v2';
+const CACHE_VERSION = 'moto-ecole-v3';
 
 // Liste des fichiers à mettre en cache dès l'installation de l'app.
 // Ce sont les fichiers essentiels pour que l'app fonctionne hors-ligne.
