@@ -82,6 +82,33 @@ tr:hover td{background:rgba(128,128,128,.04);}
 .permis-A1{background:#3b82f6;}       /* bleu — 125cc */
 .permis-A2{background:#f97316;}       /* orange — permis moto limité (le plus courant) */
 .permis-A{background:#ef4444;}        /* rouge — permis moto complet */
+
+/* ===== SIGNATURES (Canvas) ===== */
+/* Container d'une signature : canvas + bouton Effacer en surimpression */
+.signature-wrapper{position:relative;display:inline-block;width:100%;}
+/* Le canvas : fond blanc (lisible à l'impression), curseur crayon,
+   touch-action:none pour empêcher le scroll de page quand on signe au doigt */
+.signature-canvas{
+  display:block;width:100%;max-width:280px;height:90px;
+  background:#fff;
+  border:1px solid var(--border);border-radius:8px;
+  cursor:crosshair;
+  touch-action:none;
+}
+.signature-canvas:hover{border-color:var(--accent);}
+.signature-clear{
+  position:absolute;top:4px;right:4px;
+  font-size:.62rem;padding:3px 7px;
+  background:rgba(255,255,255,.85);color:#333;
+  border:1px solid var(--border);border-radius:5px;
+  cursor:pointer;opacity:.85;
+}
+.signature-clear:hover{opacity:1;}
+.signature-hint{font-size:.7rem;color:var(--muted);margin-top:3px;font-style:italic;}
+/* Miniatures des signatures dans les fiches affichées */
+.signatures-row{display:flex;gap:10px;margin-top:8px;flex-wrap:wrap;}
+.sig-mini{display:flex;flex-direction:column;gap:2px;font-size:.68rem;color:var(--muted);}
+.sig-mini img{background:#fff;border:1px solid var(--border);border-radius:4px;width:140px;height:45px;object-fit:contain;}
 /* SKILLS */
 .skill-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;font-size:.8rem;}
 .skill-name{width:115px;color:var(--muted);flex-shrink:0;}
@@ -305,6 +332,20 @@ tr:hover td{background:rgba(128,128,128,.04);}
   }
   .two-col > *, .two-stat > * {
     margin-bottom: 10px;
+  }
+
+  /* Signatures : plus grandes et clairement légendées à l'impression */
+  .sig-mini img {
+    width: 220px !important;
+    height: 70px !important;
+  }
+  .sig-mini {
+    font-size: .8rem !important;
+    color: #000 !important;
+  }
+  .signatures-row {
+    gap: 20px !important;
+    margin-top: 12px !important;
   }
 }
 </style>
@@ -583,6 +624,25 @@ tr:hover td{background:rgba(128,128,128,.04);}
           <option value="oui">✅ Oui, mettre à jour automatiquement</option>
           <option value="non">Non, garder les niveaux actuels</option>
         </select>
+      </div>
+      <div class="section-label" style="margin-top:14px;">Signatures (optionnelles)</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>👤 Moniteur</label>
+          <div class="signature-wrapper">
+            <canvas id="suivi-sig-moniteur" class="signature-canvas"></canvas>
+            <button type="button" class="signature-clear" onclick="clearSignature('moniteur')">Effacer</button>
+          </div>
+          <div class="signature-hint">Signez dans le cadre avec la souris ou le doigt</div>
+        </div>
+        <div class="form-group">
+          <label>🎓 Élève</label>
+          <div class="signature-wrapper">
+            <canvas id="suivi-sig-eleve" class="signature-canvas"></canvas>
+            <button type="button" class="signature-clear" onclick="clearSignature('eleve')">Effacer</button>
+          </div>
+          <div class="signature-hint">Signez dans le cadre avec la souris ou le doigt</div>
+        </div>
       </div>
       <div class="modal-footer"><button class="btn btn-ghost" onclick="suiviPrevStep()">← Retour</button><button class="btn btn-primary" onclick="saveSuivi()">Enregistrer la fiche</button></div>
     </div>
@@ -1114,6 +1174,11 @@ function openStudentDetail(id, opts){
         ${n.positif?`<div style="font-size:.78rem;color:var(--success);margin-bottom:3px;">✅ ${n.positif}</div>`:''}
         ${n.ameliorer?`<div style="font-size:.78rem;color:var(--warning);">⚠️ ${n.ameliorer}</div>`:''}
         ${n.objectif?`<div style="font-size:.78rem;color:var(--accent2);margin-top:4px;">🎯 ${n.objectif}</div>`:''}
+        ${(n.signatureMoniteur||n.signatureEleve)?`
+          <div class="signatures-row">
+            ${n.signatureMoniteur?`<div class="sig-mini"><span>👤 Moniteur</span><img src="${n.signatureMoniteur}" alt="Signature moniteur"/></div>`:''}
+            ${n.signatureEleve?`<div class="sig-mini"><span>🎓 Élève</span><img src="${n.signatureEleve}" alt="Signature élève"/></div>`:''}
+          </div>`:''}
       </div>`).join(''):'<p style="color:var(--muted);font-size:.81rem;">Aucune fiche de séance.</p>'}
     </div>`;
 }
@@ -1418,11 +1483,102 @@ function suiviNextStep(){
   setSuiviStep(2);
 }
 function suiviPrevStep(){setSuiviStep(1);}
+
+// ===== SIGNATURE PAD =====
+// Petite classe qui transforme un <canvas> en zone de signature.
+// Utilise les Pointer Events → un seul jeu d'événements pour souris ET doigt,
+// ce qui évite de gérer séparément "mouse" et "touch".
+class SignaturePad {
+  constructor(canvas){
+    this.canvas=canvas;
+    this.ctx=canvas.getContext('2d');
+    // Synchronise les pixels internes avec la taille CSS affichée.
+    // IMPORTANT : doit être fait quand le canvas est visible dans le DOM
+    // (sinon getBoundingClientRect retourne 0×0).
+    const rect=canvas.getBoundingClientRect();
+    canvas.width=rect.width||280;
+    canvas.height=rect.height||90;
+    this.ctx.lineCap='round';
+    this.ctx.lineJoin='round';
+    this.ctx.lineWidth=2;
+    this.ctx.strokeStyle='#000';
+    this.drawing=false;
+    this.hasStrokes=false;
+    this._bindEvents();
+    this.clear();
+  }
+  _getPoint(e){
+    const rect=this.canvas.getBoundingClientRect();
+    return {x:e.clientX-rect.left, y:e.clientY-rect.top};
+  }
+  _bindEvents(){
+    const start=(e)=>{
+      e.preventDefault();
+      // capture le pointeur : on continue de recevoir les events même si
+      // le doigt/souris sort du canvas pendant le tracé
+      if(this.canvas.setPointerCapture && e.pointerId!=null){
+        try{this.canvas.setPointerCapture(e.pointerId);}catch{}
+      }
+      this.drawing=true;
+      this.hasStrokes=true;
+      const p=this._getPoint(e);
+      this.ctx.beginPath();
+      this.ctx.moveTo(p.x,p.y);
+    };
+    const move=(e)=>{
+      if(!this.drawing)return;
+      e.preventDefault();
+      const p=this._getPoint(e);
+      this.ctx.lineTo(p.x,p.y);
+      this.ctx.stroke();
+    };
+    const end=(e)=>{
+      if(!this.drawing)return;
+      this.drawing=false;
+    };
+    this.canvas.addEventListener('pointerdown',start);
+    this.canvas.addEventListener('pointermove',move);
+    this.canvas.addEventListener('pointerup',end);
+    this.canvas.addEventListener('pointerleave',end);
+    this.canvas.addEventListener('pointercancel',end);
+  }
+  clear(){
+    this.ctx.fillStyle='#fff';
+    this.ctx.fillRect(0,0,this.canvas.width,this.canvas.height);
+    this.hasStrokes=false;
+  }
+  isEmpty(){return !this.hasStrokes;}
+  // Retourne la signature en PNG base64, ou null si vide
+  toDataURL(){
+    return this.hasStrokes?this.canvas.toDataURL('image/png'):null;
+  }
+}
+
+// Initialise les 2 pads au moment où step 2 devient visible
+// (canvas doit être rendu pour avoir de vraies dimensions)
+function initSuiviSignatures(){
+  ['moniteur','eleve'].forEach(type=>{
+    const c=document.getElementById('suivi-sig-'+type);
+    if(!c)return;
+    // On recrée toujours le pad : si le modal avait des dimensions différentes
+    // avant (p.ex. resize de la fenêtre), on remet à plat.
+    c._pad=new SignaturePad(c);
+  });
+}
+
+function clearSignature(type){
+  const c=document.getElementById('suivi-sig-'+type);
+  if(c&&c._pad)c._pad.clear();
+}
+
 function setSuiviStep(n){
   document.getElementById('suivi-step-1').classList.toggle('active',n===1);
   document.getElementById('suivi-step-2').classList.toggle('active',n===2);
   document.getElementById('sdot-1').classList.toggle('active',n===1);
   document.getElementById('sdot-2').classList.toggle('active',n===2);
+  // Quand on entre dans l'étape 2, on initialise les canvas signature
+  // (ils sont dans #suivi-step-2 donc display:none avant → rect 0×0 inutilisable)
+  if(n===2)initSuiviSignatures();
 }
 function saveSuivi(){
   const sid=parseInt(document.getElementById('suivi-student').value);
@@ -1430,6 +1586,9 @@ function saveSuivi(){
   if(!date||!sid){showToast('Informations manquantes','error');return;}
   const skills={};
   SKILLS.forEach(sk=>{if(document.getElementById('sck-'+sk)?.checked){const v=document.getElementById('ssl-'+sk)?.value;if(v)skills[sk]=v;}});
+  // Récupère les signatures (null si l'utilisateur n'a pas signé)
+  const sigMoniteur=document.getElementById('suivi-sig-moniteur')?._pad?.toDataURL()||null;
+  const sigEleve=document.getElementById('suivi-sig-eleve')?._pad?.toDataURL()||null;
   const suivi={id:nouvelId('suivis'),studentId:sid,date,
     type:document.getElementById('suivi-type').value,
     dur:parseFloat(document.getElementById('suivi-dur').value)||1,
@@ -1440,6 +1599,8 @@ function saveSuivi(){
     positif:document.getElementById('suivi-positif').value.trim(),
     ameliorer:document.getElementById('suivi-ameliorer').value.trim(),
     objectif:document.getElementById('suivi-objectif').value.trim(),
+    signatureMoniteur:sigMoniteur,
+    signatureEleve:sigEleve,
   };
   suivis.push(suivi);
   if(document.getElementById('suivi-update-skills').value==='oui'){
