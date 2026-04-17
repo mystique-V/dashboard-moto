@@ -559,13 +559,15 @@ let suivis=[
   {id:103,studentId:3,date:nextDate(-5),type:'Freinage d\'urgence',dur:1,moniteurId:2,skills:{Freinage:'En progression'},comportement:'😐 Neutre',securite:'⚠️ À améliorer',positif:'Réactions correctes sol sec.',ameliorer:'Panique sur sol mouillé.',objectif:'Réduire temps de réaction.'},
   {id:104,studentId:6,date:nextDate(-6),type:'Conduite en ville',dur:1.5,moniteurId:2,skills:{Signalisation:'Acquis'},comportement:'😟 Difficultés',securite:'⚠️ À améliorer',positif:'Bonne lecture panneaux.',ameliorer:'Manque de confiance en insertion.',objectif:'Reprendre manœuvres d\'insertion.'},
 ];
-let nextId=200;
+// Compteurs d'ID séparés par type de donnée (évite les conflits lors d'imports)
+let nextIds={students:200,events:200,suivis:200,moniteurs:200};
+function nouvelId(type){return nextIds[type]++;}
 let currentMoniteurId=1; // Moniteur connecté par défaut
 
 // ===== LOCALSTORAGE =====
 function saveData(){
   try{
-    const json=JSON.stringify({students,events,suivis,moniteurs,nextId,currentMoniteurId});
+    const json=JSON.stringify({students,events,suivis,moniteurs,nextIds,currentMoniteurId});
     localStorage.setItem(STORE_KEY,json);
     updateStorageInfo();
   }catch(e){showToast('⚠️ Erreur de sauvegarde — stockage plein ?','warn');}
@@ -576,7 +578,9 @@ function loadData(){
     if(d){const p=JSON.parse(d);
       students=p.students||students;events=p.events||events;
       suivis=p.suivis||suivis;moniteurs=p.moniteurs||moniteurs;
-      nextId=p.nextId||nextId;currentMoniteurId=p.currentMoniteurId||currentMoniteurId;
+      if(p.nextIds)nextIds=p.nextIds;
+      else if(p.nextId)nextIds={students:p.nextId,events:p.nextId,suivis:p.nextId,moniteurs:p.nextId};
+      currentMoniteurId=p.currentMoniteurId||currentMoniteurId;
     }
   }catch(e){console.warn('Load failed',e);}
 }
@@ -597,7 +601,7 @@ function updateStorageInfo(){
 
 // ===== EXPORT / IMPORT =====
 function exportData(){
-  const data={version:2,exported:new Date().toISOString(),students,events,suivis,moniteurs,nextId};
+  const data={version:3,exported:new Date().toISOString(),students,events,suivis,moniteurs,nextIds};
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
@@ -615,7 +619,9 @@ function importData(event){
       if(!d.students)throw new Error('Format invalide');
       if(!confirm(`Importer ${d.students.length} élèves, ${d.events?.length||0} cours, ${d.suivis?.length||0} fiches ?\nVos données actuelles seront remplacées.`))return;
       students=d.students;events=d.events||[];suivis=d.suivis||[];
-      moniteurs=d.moniteurs||moniteurs;nextId=d.nextId||nextId;
+      moniteurs=d.moniteurs||moniteurs;
+      if(d.nextIds)nextIds=d.nextIds;
+      else if(d.nextId)nextIds={students:d.nextId,events:d.nextId,suivis:d.nextId,moniteurs:d.nextId};
       saveData();renderDashboard();
       showToast(`Import réussi : ${students.length} élèves ✅`);
     }catch(err){showToast('Fichier invalide ou corrompu','error');}
@@ -649,7 +655,7 @@ function populateMoniteurSelects(){
 function addMoniteur(){
   const name=document.getElementById('new-moniteur-name').value.trim();
   if(!name){showToast('Nom requis','error');return;}
-  moniteurs.push({id:nextId++,name});
+  moniteurs.push({id:nouvelId('moniteurs'),name});
   saveData();renderMoniteursList();populateMoniteurSelects();
   document.getElementById('new-moniteur-name').value='';
   showToast('Moniteur ajouté ✅');
@@ -1053,7 +1059,7 @@ function saveEvent(){
     if(e){e.studentId=sid;e.date=date;e.time=time;e.type=type;e.dur=dur;e.moniteurId=moniteurId;}
     showToast('Cours modifié ✅');
   }else{
-    events.push({id:nextId++,studentId:sid,date,time,type,dur,moniteurId});
+    events.push({id:nouvelId('events'),studentId:sid,date,time,type,dur,moniteurId});
     const s=students.find(x=>x.id===sid);if(s)s.history.push({date,type,dur});
     showToast('Cours ajouté ✅');
   }
@@ -1130,7 +1136,7 @@ function saveSuivi(){
   if(!date||!sid){showToast('Informations manquantes','error');return;}
   const skills={};
   SKILLS.forEach(sk=>{if(document.getElementById('sck-'+sk)?.checked){const v=document.getElementById('ssl-'+sk)?.value;if(v)skills[sk]=v;}});
-  const suivi={id:nextId++,studentId:sid,date,
+  const suivi={id:nouvelId('suivis'),studentId:sid,date,
     type:document.getElementById('suivi-type').value,
     dur:parseFloat(document.getElementById('suivi-dur').value)||1,
     moniteurId:parseInt(document.getElementById('suivi-moniteur-select').value)||currentMoniteurId,
@@ -1264,7 +1270,7 @@ function addStudent(){
   ok=validateField('new-lname','err-lname',!!lname)&&ok;
   if(!ok)return;
   const moniteurId=parseInt(document.getElementById('new-moniteur-assign').value)||currentMoniteurId;
-  students.push({id:nextId++,fname,lname,phone:document.getElementById('new-phone').value||'—',hours:parseInt(document.getElementById('new-hours').value)||0,exam:document.getElementById('new-exam').value,comment:'',moniteurId,skills:{Freinage:'Débutant',Virage:'Débutant',Maniabilité:'Débutant',Équilibre:'Débutant',Signalisation:'Débutant',Vitesse:'Débutant'},history:[]});
+  students.push({id:nouvelId('students'),fname,lname,phone:document.getElementById('new-phone').value||'—',hours:parseInt(document.getElementById('new-hours').value)||0,exam:document.getElementById('new-exam').value,comment:'',moniteurId,skills:{Freinage:'Débutant',Virage:'Débutant',Maniabilité:'Débutant',Équilibre:'Débutant',Signalisation:'Débutant',Vitesse:'Débutant'},history:[]});
   saveData();closeModal('add-student');
   ['new-fname','new-lname','new-phone'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('new-hours').value=0;
