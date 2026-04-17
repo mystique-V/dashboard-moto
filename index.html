@@ -541,8 +541,25 @@ let calMonth=new Date();
 let weekStart=mondayOf(new Date());
 let selectedDay=null;
 
-function today(){return new Date().toISOString().split('T')[0];}
-function nextDate(n){const d=new Date();d.setDate(d.getDate()+n);return d.toISOString().split('T')[0];}
+// === GESTION DATES LOCALES ===
+// toISOString() retourne toujours en UTC → bug à la Réunion (UTC+4) entre 00h et 04h
+// Ces fonctions garantissent YYYY-MM-DD en heure LOCALE
+function toLocalISO(d){
+  const x=d||new Date();
+  const y=x.getFullYear();
+  const m=String(x.getMonth()+1).padStart(2,'0');
+  const dd=String(x.getDate()).padStart(2,'0');
+  return `${y}-${m}-${dd}`;
+}
+// Parse "YYYY-MM-DD" comme un Date local (pas UTC)
+// new Date("2026-04-17") donne UTC midnight → décalage possible en local
+function parseLocalDate(iso){
+  if(!iso)return new Date();
+  const [y,m,d]=iso.split('-').map(Number);
+  return new Date(y,(m||1)-1,d||1);
+}
+function today(){return toLocalISO();}
+function nextDate(n){const d=new Date();d.setDate(d.getDate()+n);return toLocalISO(d);}
 function mondayOf(d){const c=new Date(d);const day=c.getDay();const diff=c.getDate()-(day===0?6:day-1);c.setDate(diff);return c;}
 
 // ===== DONNÉES PAR DÉFAUT =====
@@ -1051,7 +1068,7 @@ function renderCalendar(){
   const first=new Date(calMonth.getFullYear(),calMonth.getMonth(),1);
   const last=new Date(calMonth.getFullYear(),calMonth.getMonth()+1,0);
   let sdow=first.getDay();sdow=sdow===0?6:sdow-1;
-  const evDays=new Set(events.filter(e=>{const d=new Date(e.date);return d.getMonth()===calMonth.getMonth()&&d.getFullYear()===calMonth.getFullYear();}).map(e=>new Date(e.date).getDate()));
+  const evDays=new Set(events.filter(e=>{const d=parseLocalDate(e.date);return d.getMonth()===calMonth.getMonth()&&d.getFullYear()===calMonth.getFullYear();}).map(e=>parseLocalDate(e.date).getDate()));
   const todayDate=new Date();
   let html=Array(sdow).fill('<div class="cal-day empty">.</div>').join('');
   for(let i=1;i<=last.getDate();i++){
@@ -1070,9 +1087,9 @@ function filterEventsByDay(d){
 }
 function renderEventsList(){
   const list=events.filter(e=>{
-    const dt=new Date(e.date);
+    const dt=parseLocalDate(e.date);
     if(dt.getMonth()!==calMonth.getMonth()||dt.getFullYear()!==calMonth.getFullYear())return false;
-    if(selectedDay&&new Date(e.date).getDate()!==selectedDay)return false;
+    if(selectedDay&&parseLocalDate(e.date).getDate()!==selectedDay)return false;
     return true;
   }).sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time));
   document.getElementById('events-list').innerHTML=list.length?list.map(e=>{
@@ -1103,7 +1120,7 @@ function renderWeek(){
   let html='';
   for(let i=0;i<7;i++){
     const d=new Date(weekStart);d.setDate(d.getDate()+i);
-    const dStr=d.toISOString().split('T')[0];
+    const dStr=toLocalISO(d);
     const isToday=dStr===todayStr;
     const dayEvs=events.filter(e=>e.date===dStr).sort((a,b)=>a.time.localeCompare(b.time));
     html+=`<div class="week-day-col">
