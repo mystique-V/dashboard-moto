@@ -182,6 +182,9 @@ tr:hover td{background:rgba(128,128,128,.04);}
 /* ALERTS */
 .ready-alert{background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.3);border-radius:10px;padding:12px 16px;margin-bottom:10px;display:flex;align-items:center;gap:10px;font-size:.82rem;flex-wrap:wrap;}
 .storage-alert{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.4);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:.82rem;display:none;}
+.storage-alert.danger{background:rgba(244,63,94,.12);border-color:rgba(244,63,94,.5);color:var(--danger);}
+.storage-alert .act{margin-top:8px;}
+.storage-alert .act .btn{margin-right:6px;}
 /* MONITEUR badge */
 .moniteur-badge{background:rgba(99,102,241,.15);color:var(--accent2);padding:2px 8px;border-radius:99px;font-size:.68rem;font-weight:700;}
 /* HAMBURGER */
@@ -250,7 +253,8 @@ tr:hover td{background:rgba(128,128,128,.04);}
       <!-- ===== DASHBOARD ===== -->
       <div class="page active" id="page-dashboard">
         <div id="storage-alert-banner" class="storage-alert">
-          ⚠️ <strong>Attention :</strong> votre stockage local est presque plein (<span id="storage-pct"></span>%). Pensez à exporter vos données via le bouton <strong>📤 Export</strong> dans la barre latérale.
+          <div id="storage-alert-text">⚠️ <strong>Attention :</strong> votre stockage local est presque plein (<span id="storage-pct"></span>%). Pensez à exporter vos données.</div>
+          <div class="act"><button class="btn btn-primary btn-sm" onclick="exportData()">📤 Exporter maintenant</button></div>
         </div>
         <div class="kpi-grid">
           <div class="kpi-card"><div class="kpi-icon">👥</div><div class="kpi-label">Élèves actifs</div><div class="kpi-value" id="kpi-total">—</div><div class="kpi-sub">inscrits</div></div>
@@ -578,12 +582,41 @@ function nouvelId(type){return nextIds[type]++;}
 let currentMoniteurId=1; // Moniteur connecté par défaut
 
 // ===== LOCALSTORAGE =====
+// Flag levé quand une modification n'a pas pu être persistée (quota plein, etc.)
+// Utilisé par updateStorageInfo + beforeunload pour avertir avant fermeture d'onglet
+let pendingUnsavedChanges=false;
+const STORAGE_LIMIT=5*1024*1024;       // limite navigateur typique (5 Mo)
+const STORAGE_SAFE_LIMIT=4.5*1024*1024; // marge de sécurité 10%
+
 function saveData(){
+  const json=JSON.stringify({students,events,suivis,moniteurs,nextIds,currentMoniteurId});
+  const size=new Blob([json]).size;
   try{
-    const json=JSON.stringify({students,events,suivis,moniteurs,nextIds,currentMoniteurId});
+    // Refus préventif si trop gros (évite l'écriture partielle)
+    if(size>STORAGE_SAFE_LIMIT)throw new Error('quota-preemptive');
     localStorage.setItem(STORE_KEY,json);
+    pendingUnsavedChanges=false;
     updateStorageInfo();
-  }catch(e){showToast('⚠️ Erreur de sauvegarde — stockage plein ?','warn');}
+    return true;
+  }catch(e){
+    const isQuota=e.message==='quota-preemptive'||e.name==='QuotaExceededError'||e.code===22||e.code===1014;
+    pendingUnsavedChanges=true;
+    updateStorageInfo();
+    if(isQuota){showQuotaFullDialog(size);}
+    else{console.warn('saveData failed:',e);showToast('⚠️ Erreur de sauvegarde','error');}
+    return false;
+  }
+}
+
+function showQuotaFullDialog(size){
+  const mb=(size/(1024*1024)).toFixed(2);
+  const ok=confirm(
+    '⚠️ STOCKAGE SATURÉ\n\n'+
+    `Vos données (${mb} Mo) ne tiennent plus dans le stockage du navigateur (5 Mo max).\n\n`+
+    'Votre dernière modification n\'a PAS été sauvegardée et sera perdue si vous fermez l\'onglet.\n\n'+
+    'Exporter vos données maintenant pour les conserver ?'
+  );
+  if(ok)exportData();
 }
 function loadData(){
   try{
@@ -599,18 +632,45 @@ function loadData(){
 }
 function updateStorageInfo(){
   try{
-    const used=new Blob([localStorage.getItem(STORE_KEY)||'']).size;
-    const maxBytes=5*1024*1024;
-    const pct=Math.round(used/maxBytes*100);
-    document.getElementById('storage-info').textContent=`Stockage : ${pct}% utilisé`;
+    // On calcule sur les données in-memory (reflète ce qui devrait être persisté)
+    const payload=JSON.stringify({students,events,suivis,moniteurs,nextIds,currentMoniteurId});
+    const used=new Blob([payload]).size;
+    const pct=Math.min(999,Math.round(used/STORAGE_LIMIT*100));
+    const info=document.getElementById('storage-info');
+    if(info){
+      const suffix=pendingUnsavedChanges?' ⚠️ NON SAUVÉ':'';
+      info.textContent=`Stockage : ${pct}% utilisé${suffix}`;
+      info.style.color=pendingUnsavedChanges||pct>=90?'var(--danger)':pct>=75?'var(--warning)':'var(--muted)';
+    }
     const banner=document.getElementById('storage-alert-banner');
     if(banner){
-      banner.style.display=pct>75?'block':'none';
-      const el=document.getElementById('storage-pct');
-      if(el)el.textContent=pct;
+      const show=pct>=75||pendingUnsavedChanges;
+      banner.style.display=show?'block':'none';
+      const danger=pct>=90||pendingUnsavedChanges;
+      banner.classList.toggle('danger',danger);
+      const txt=document.getElementById('storage-alert-text');
+      if(txt){
+        if(pendingUnsavedChanges){
+          txt.innerHTML=`⚠️ <strong>Données non sauvegardées !</strong> Le stockage est saturé (${pct}%). Exportez immédiatement pour ne rien perdre.`;
+        }else if(pct>=90){
+          txt.innerHTML=`⛔ <strong>Stockage critique :</strong> ${pct}% utilisés. Sauvegarde bientôt impossible — exportez puis supprimez d'anciennes données.`;
+        }else{
+          txt.innerHTML=`⚠️ <strong>Attention :</strong> stockage à ${pct}%. Pensez à exporter régulièrement.`;
+        }
+      }
+      const pctEl=document.getElementById('storage-pct');
+      if(pctEl)pctEl.textContent=pct;
     }
   }catch(e){}
 }
+
+// Empêche la fermeture accidentelle de l'onglet si des modifs ne sont pas persistées
+window.addEventListener('beforeunload',e=>{
+  if(pendingUnsavedChanges){
+    e.preventDefault();
+    e.returnValue=''; // requis par certains navigateurs pour déclencher la popup
+  }
+});
 
 // ===== EXPORT / IMPORT =====
 function exportData(){
