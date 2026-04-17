@@ -675,11 +675,42 @@ function addMoniteur(){
 }
 function deleteMoniteur(id){
   if(moniteurs.length<=1){showToast('Impossible : au moins un moniteur requis','error');return;}
-  if(!confirm('Supprimer ce moniteur ?'))return;
-  moniteurs=moniteurs.filter(m=>m.id!==id);
-  if(currentMoniteurId===id)currentMoniteurId=moniteurs[0].id;
+  const m=moniteurs.find(x=>x.id===id);
+  if(!m)return;
+  // Compter toutes les références (orphelins potentiels)
+  const nbStudents=students.filter(s=>s.moniteurId===id).length;
+  const nbEvents=events.filter(e=>e.moniteurId===id).length;
+  const nbSuivis=suivis.filter(f=>f.moniteurId===id).length;
+  const total=nbStudents+nbEvents+nbSuivis;
+  // Cible de réaffectation : autre moniteur (priorité au moniteur actuel, sinon le premier restant)
+  const autres=moniteurs.filter(x=>x.id!==id);
+  const cible=autres.find(x=>x.id===currentMoniteurId)||autres[0];
+  let msg=`Supprimer ${m.name} ?`;
+  if(total>0){
+    const parts=[];
+    if(nbStudents)parts.push(`${nbStudents} élève${nbStudents>1?'s':''}`);
+    if(nbEvents)parts.push(`${nbEvents} cours`);
+    if(nbSuivis)parts.push(`${nbSuivis} fiche${nbSuivis>1?'s':''}`);
+    msg+=`\n\n⚠️ ${total} référence${total>1?'s':''} seront réaffectées à ${cible.name} :\n• ${parts.join('\n• ')}`;
+  }
+  msg+=`\n\nContinuer ?`;
+  if(!confirm(msg))return;
+  // Réaffectation des références avant suppression (évite les orphelins)
+  if(total>0){
+    students.forEach(s=>{if(s.moniteurId===id)s.moniteurId=cible.id;});
+    events.forEach(e=>{if(e.moniteurId===id)e.moniteurId=cible.id;});
+    suivis.forEach(f=>{if(f.moniteurId===id)f.moniteurId=cible.id;});
+  }
+  moniteurs=moniteurs.filter(x=>x.id!==id);
+  if(currentMoniteurId===id)currentMoniteurId=cible.id;
   saveData();renderMoniteursList();populateMoniteurSelects();updateMoniteurLabel();
-  showToast('Moniteur supprimé');
+  // Refresh vues actives
+  const active=document.querySelector('.page.active')?.id;
+  if(active==='page-students')renderStudentsTable();
+  else if(active==='page-suivis')renderSuivis();
+  else if(active==='page-calendar'){if(calView==='week')renderWeek();else renderCalendar();}
+  else if(active==='page-dashboard')renderDashboard();
+  showToast(total>0?`Moniteur supprimé (+${total} réaffecté${total>1?'s':''} à ${cible.name})`:'Moniteur supprimé');
 }
 function switchMoniteur(id){currentMoniteurId=id;saveData();updateMoniteurLabel();closeModal('moniteurs');showToast('Moniteur actif : '+currentMoniteur().name);}
 function renderMoniteursList(){
@@ -917,11 +948,31 @@ function saveEditStudent(){
 }
 function deleteStudent(){
   const id=parseInt(document.getElementById('edit-id').value);
-  if(!confirm('Supprimer cet élève définitivement ?'))return;
-  students=students.filter(s=>s.id!==id);
+  const s=students.find(x=>x.id===id);
+  if(!s)return;
+  // Compter les références avant suppression pour informer l'utilisateur
+  const nbEvents=events.filter(e=>e.studentId===id).length;
+  const nbSuivis=suivis.filter(f=>f.studentId===id).length;
+  let msg=`Supprimer définitivement ${s.fname} ${s.lname} ?`;
+  if(nbEvents||nbSuivis){
+    const parts=[];
+    if(nbEvents)parts.push(`${nbEvents} cours`);
+    if(nbSuivis)parts.push(`${nbSuivis} fiche${nbSuivis>1?'s':''} de suivi`);
+    msg+=`\n\nCela supprimera aussi : ${parts.join(' et ')}.`;
+  }
+  msg+=`\n\nCette action est irréversible.`;
+  if(!confirm(msg))return;
+  students=students.filter(x=>x.id!==id);
   events=events.filter(e=>e.studentId!==id);
   suivis=suivis.filter(f=>f.studentId!==id);
-  saveData();closeModal('edit-student');showToast('Élève supprimé');showPage('students',document.querySelectorAll('.nav-item')[1]);
+  // Réinitialiser les filtres qui pointaient vers cet élève (références orphelines)
+  const fSuivi=document.getElementById('filter-suivi-student');
+  if(fSuivi && parseInt(fSuivi.value)===id)fSuivi.value='';
+  const fStats=document.getElementById('stats-student-select');
+  if(fStats && parseInt(fStats.value)===id)fStats.value='';
+  saveData();closeModal('edit-student');
+  showToast(`Élève supprimé ${nbEvents||nbSuivis?`(+${nbEvents+nbSuivis} liés)`:''}`);
+  showPage('students',document.querySelectorAll('.nav-item')[1]);
 }
 
 // ===== CALENDAR =====
