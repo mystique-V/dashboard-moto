@@ -651,7 +651,7 @@ function updateStorageInfo(){
       const txt=document.getElementById('storage-alert-text');
       if(txt){
         if(pendingUnsavedChanges){
-          txt.innerHTML=`⚠️ <strong>Données non sauvegardées !</strong> Le stockage est saturé (${pct}%). Exportez immédiatement pour ne rien perdre.`;
+          txt.innerHTML=`⚠️ <strong>Données non sauvegardées !</strong> La dernière modification n'a pas pu être enregistrée — exportez immédiatement pour ne rien perdre.`;
         }else if(pct>=90){
           txt.innerHTML=`⛔ <strong>Stockage critique :</strong> ${pct}% utilisés. Sauvegarde bientôt impossible — exportez puis supprimez d'anciennes données.`;
         }else{
