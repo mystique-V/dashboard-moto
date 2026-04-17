@@ -212,6 +212,83 @@ tr:hover td{background:rgba(128,128,128,.04);}
   .topbar-right .search-bar{display:none;}
   .week-grid{grid-template-columns:1fr 1fr;}
 }
+
+/* ===== IMPRESSION : mise en page spéciale quand on lance une impression =====
+   Règle : on masque tout le "chrome" de l'app (sidebar, topbar, boutons d'action)
+   et on ne garde que la fiche élève, avec des couleurs compatibles papier. */
+@media print {
+  /* Format A4 avec des marges généreuses */
+  @page { size: A4; margin: 1.2cm; }
+
+  /* Fond blanc + texte noir pour économiser l'encre et rester lisible */
+  html, body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  /* Masque tout ce qui n'est pas utile à la fiche imprimée */
+  .sidebar,
+  .sidebar-overlay,
+  .topbar,
+  .toast,
+  .modal-overlay,
+  #storage-alert-banner,
+  .back-btn,
+  .hamburger,
+  .theme-toggle,
+  .cal-view-tabs {
+    display: none !important;
+  }
+
+  /* On n'imprime QUE la fiche élève, toutes les autres pages sont masquées */
+  .page { display: none !important; }
+  .page#page-student-detail { display: block !important; }
+
+  /* Les boutons d'action dans la fiche (Modifier, + Fiche séance, Imprimer, 🗑) */
+  .detail-header .btn,
+  .note-card .btn,
+  .hist-item .btn,
+  .no-print {
+    display: none !important;
+  }
+
+  /* Layout plein écran pour l'impression */
+  .main, .content {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Les cartes en mode impression : bordure simple, pas de fond coloré */
+  .card, .note-card, .stat-pill, .hist-item, .skill-row, .detail-header {
+    background: #fff !important;
+    color: #000 !important;
+    border: 1px solid #ccc !important;
+    box-shadow: none !important;
+    /* Évite qu'une carte soit coupée en plein milieu par un saut de page */
+    page-break-inside: avoid;
+  }
+
+  /* Les couleurs des badges (permis, statut, niveau) DOIVENT s'imprimer —
+     sinon on perd l'info visuelle. Ces 2 lignes forcent le navigateur à
+     imprimer les fonds colorés au lieu de les remplacer par du blanc. */
+  .permis-badge, .tag, .ready-badge, .moniteur-badge, .skill-badge, .avatar, .detail-avatar {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Les titres restent bien visibles */
+  h1, h2, h3, .card-title { color: #000 !important; }
+
+  /* Le 2-col grid devient une seule colonne à l'impression (plus lisible) */
+  .two-col, .two-stat {
+    display: block !important;
+  }
+  .two-col > *, .two-stat > * {
+    margin-bottom: 10px;
+  }
+}
 </style>
 </head>
 <body>
@@ -969,12 +1046,17 @@ function renderStudentsTable(){
 }
 
 // ===== STUDENT DETAIL =====
-function openStudentDetail(id){
+// opts.printMode=true → affiche TOUTES les fiches (au lieu des 3 dernières),
+// utilisé par printStudent() pour préparer la page avant window.print().
+function openStudentDetail(id, opts){
+  opts=opts||{};
   const s=students.find(x=>x.id===id);if(!s)return;
   showPage('student-detail',null);
   const c=COLORS[s.id%COLORS.length];
   const hist=[...s.history].sort((a,b)=>b.date.localeCompare(a.date));
   const sNotes=suivis.filter(n=>n.studentId===id).sort((a,b)=>b.date.localeCompare(a.date));
+  // Combien de fiches on affiche : tout en impression, sinon les 3 plus récentes
+  const fichesToShow=opts.printMode?sNotes:sNotes.slice(0,3);
   const ready=isReadyForExam(s)&&s.exam!=='Réussi';
   document.getElementById('student-detail-content').innerHTML=`
     <div class="detail-header">
@@ -986,6 +1068,7 @@ function openStudentDetail(id){
       </div>
       <div style="margin-left:auto;display:flex;gap:7px;flex-wrap:wrap;">
         <button class="btn btn-ghost btn-sm" onclick="openSuiviModal(${id})">+ Fiche séance</button>
+        <button class="btn btn-ghost btn-sm" onclick="printStudent(${id})">🖨️ Imprimer</button>
         <button class="btn btn-primary btn-sm" onclick="openEditModal(${id})">✏️ Modifier</button>
       </div>
     </div>
@@ -1005,7 +1088,7 @@ function openStudentDetail(id){
     </div>
     <div class="card" style="margin-top:14px;">
       <div class="card-title"><span>Dernières fiches de séance</span><span style="font-size:.72rem;color:var(--muted)">${sNotes.length} fiche${sNotes.length>1?'s':''}</span></div>
-      ${sNotes.length?sNotes.slice(0,3).map(n=>`<div class="note-card">
+      ${fichesToShow.length?fichesToShow.map(n=>`<div class="note-card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:5px;">
           <div class="note-date">${n.date} · ${n.type} (${n.dur}h) · <span class="moniteur-badge">${moniteurName(n.moniteurId)}</span></div>
           <div style="display:flex;gap:5px;align-items:center;"><span style="font-size:.74rem">${n.comportement}</span><button class="btn btn-danger btn-sm" onclick="deleteSuivi(${n.id},${id})">🗑</button></div>
@@ -1015,6 +1098,25 @@ function openStudentDetail(id){
         ${n.objectif?`<div style="font-size:.78rem;color:var(--accent2);margin-top:4px;">🎯 ${n.objectif}</div>`:''}
       </div>`).join(''):'<p style="color:var(--muted);font-size:.81rem;">Aucune fiche de séance.</p>'}
     </div>`;
+}
+
+// ===== IMPRESSION FICHE ÉLÈVE =====
+// Stratégie : on re-rend la fiche en "mode impression" (= toutes les fiches de séance
+// visibles, pas juste les 3 dernières), on lance le dialogue d'impression, puis on
+// restaure l'affichage normal une fois l'impression terminée (événement "afterprint").
+function printStudent(id){
+  const s=students.find(x=>x.id===id);
+  if(!s){showToast('Élève introuvable','error');return;}
+  // 1. Re-rend la fiche avec toutes les fiches visibles
+  openStudentDetail(id,{printMode:true});
+  // 2. Quand l'impression est terminée (ou annulée), on restaure l'affichage standard
+  const restore=()=>{
+    openStudentDetail(id);
+    window.removeEventListener('afterprint',restore);
+  };
+  window.addEventListener('afterprint',restore);
+  // 3. Petit délai pour laisser le DOM se mettre à jour avant d'ouvrir le dialogue
+  setTimeout(()=>window.print(),50);
 }
 
 // ===== EDIT MODAL =====
