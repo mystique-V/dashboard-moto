@@ -224,6 +224,24 @@ tr:hover td{background:rgba(128,128,128,.04);}
   html, body {
     background: #fff !important;
     color: #000 !important;
+    /* IMPORTANT : libère la hauteur pour que le contenu puisse s'étaler
+       naturellement sur plusieurs pages A4 au lieu d'être clippé */
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* Le layout principal contraint l'app à 100vh + overflow hidden pour faire
+     un scroll interne. À l'impression, il faut débloquer ces contraintes
+     sinon le contenu est tronqué à la première page. */
+  .shell {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+  .main, .content, #page-student-detail, #student-detail-content {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
   }
 
   /* Masque tout ce qui n'est pas utile à la fiche imprimée */
