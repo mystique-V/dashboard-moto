@@ -109,6 +109,23 @@ tr:hover td{background:rgba(128,128,128,.04);}
 .signatures-row{display:flex;gap:10px;margin-top:8px;flex-wrap:wrap;}
 .sig-mini{display:flex;flex-direction:column;gap:2px;font-size:.68rem;color:var(--muted);}
 .sig-mini img{background:#fff;border:1px solid var(--border);border-radius:4px;width:140px;height:45px;object-fit:contain;}
+/* ===== PAIEMENTS ===== */
+/* Les 3 KPIs côte à côte : Dû / Payé / Solde */
+.paiement-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;}
+.paiement-kpi{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px;}
+.paiement-kpi .pk-lbl{font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;}
+.paiement-kpi .pk-val{font-size:1.05rem;font-weight:700;}
+/* Solde : vert si à jour (>=0 = rien dû), rouge si dette, bleu si crédit (trop versé) */
+.paiement-kpi.solde-ok .pk-val{color:var(--success);}
+.paiement-kpi.solde-dette .pk-val{color:var(--danger);}
+.paiement-kpi.solde-credit .pk-val{color:var(--accent2);}
+/* Ligne d'un paiement dans la liste */
+.paiement-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(128,128,128,.08);font-size:.82rem;}
+.paiement-row:last-child{border-bottom:none;}
+.paiement-row .pr-date{color:var(--muted);font-size:.74rem;white-space:nowrap;width:90px;}
+.paiement-row .pr-methode{background:rgba(99,102,241,.12);color:var(--accent2);padding:2px 7px;border-radius:99px;font-size:.67rem;font-weight:700;}
+.paiement-row .pr-montant{color:var(--success);font-weight:700;margin-left:auto;white-space:nowrap;}
+.paiement-row .pr-note{flex:1;color:var(--muted);font-size:.76rem;font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 /* SKILLS */
 .skill-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;font-size:.8rem;}
 .skill-name{width:115px;color:var(--muted);flex-shrink:0;}
@@ -306,7 +323,8 @@ tr:hover td{background:rgba(128,128,128,.04);}
   }
 
   /* Les cartes en mode impression : bordure simple, pas de fond coloré */
-  .card, .note-card, .stat-pill, .hist-item, .skill-row, .detail-header {
+  .card, .note-card, .stat-pill, .hist-item, .skill-row, .detail-header,
+  .paiement-kpi, .paiement-row {
     background: #fff !important;
     color: #000 !important;
     border: 1px solid #ccc !important;
@@ -314,6 +332,12 @@ tr:hover td{background:rgba(128,128,128,.04);}
     /* Évite qu'une carte soit coupée en plein milieu par un saut de page */
     page-break-inside: avoid;
   }
+  /* Paiements à l'impression : KPIs en ligne, méthode en texte noir, lignes lisibles */
+  .paiement-kpis { display: grid !important; grid-template-columns: repeat(3,1fr) !important; gap: 8px !important; }
+  .paiement-kpi .pk-val { color: #000 !important; }
+  .paiement-row { border: none !important; border-bottom: 1px solid #eee !important; }
+  .paiement-row .pr-methode { background: #f0f0f0 !important; color: #000 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  .paiement-row .pr-montant { color: #000 !important; font-weight: 700 !important; }
 
   /* Les couleurs des badges (permis, statut, niveau) DOIVENT s'imprimer —
      sinon on perd l'info visuelle. Ces 2 lignes forcent le navigateur à
@@ -404,6 +428,19 @@ tr:hover td{background:rgba(128,128,128,.04);}
           <div class="kpi-card"><div class="kpi-icon">🎯</div><div class="kpi-label">Prêts pour l'examen</div><div class="kpi-value" style="color:var(--accent2)" id="kpi-ready">—</div><div class="kpi-sub">toutes compétences ok</div></div>
         </div>
         <div id="ready-alerts"></div>
+        <!-- Bloc financier : créances (reste à encaisser) + CA du mois en cours -->
+        <div class="two-col">
+          <div class="card">
+            <div class="card-title"><span>💶 Créances en cours</span><span style="font-size:.72rem;color:var(--muted);" id="dash-creances-count">—</span></div>
+            <div class="kpi-value" id="dash-creances" style="color:var(--warning);">—</div>
+            <div class="kpi-sub">à encaisser sur <span id="dash-creances-eleves">—</span> élève(s)</div>
+          </div>
+          <div class="card">
+            <div class="card-title"><span>📈 Chiffre d'affaires du mois</span><span style="font-size:.72rem;color:var(--muted);" id="dash-ca-count">—</span></div>
+            <div class="kpi-value" id="dash-ca" style="color:var(--success);">—</div>
+            <div class="kpi-sub" id="dash-ca-sub">—</div>
+          </div>
+        </div>
         <div class="two-col">
           <div class="card"><div class="card-title"><span>Cours aujourd'hui</span><span class="tag tag-blue" id="today-count">0</span></div><div id="today-events"></div></div>
           <div class="card"><div class="card-title"><span>Progression par compétence</span></div><div id="skills-overview"></div></div>
@@ -547,7 +584,10 @@ tr:hover td{background:rgba(128,128,128,.04);}
         <option value="A">A — Permis moto complet</option>
       </select></div>
     </div>
-    <div class="form-group"><label>Moniteur référent</label><select id="new-moniteur-assign" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 11px;color:var(--text);font-size:.84rem;outline:none;"></select></div>
+    <div class="form-row">
+      <div class="form-group"><label>Tarif horaire (€)</label><input id="new-tarif" type="number" value="50" min="0" step="1"/></div>
+      <div class="form-group"><label>Moniteur référent</label><select id="new-moniteur-assign" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 11px;color:var(--text);font-size:.84rem;outline:none;"></select></div>
+    </div>
     <div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal('add-student')">Annuler</button><button class="btn btn-primary" onclick="addStudent()">Ajouter</button></div>
   </div>
 </div>
@@ -670,7 +710,10 @@ tr:hover td{background:rgba(128,128,128,.04);}
         <option value="A">A — Permis moto complet</option>
       </select></div>
     </div>
-    <div class="form-group"><label>Moniteur référent</label><select id="edit-moniteur-assign" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 11px;color:var(--text);font-size:.84rem;outline:none;"></select></div>
+    <div class="form-row">
+      <div class="form-group"><label>Tarif horaire (€)</label><input id="edit-tarif" type="number" min="0" step="1"/></div>
+      <div class="form-group"><label>Moniteur référent</label><select id="edit-moniteur-assign" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 11px;color:var(--text);font-size:.84rem;outline:none;"></select></div>
+    </div>
     <div class="form-group"><label>Commentaire / objectifs</label><textarea id="edit-comment" placeholder="Remarques libres…"></textarea></div>
     <div class="section-label">Compétences</div>
     <div id="edit-skills-inputs"></div>
@@ -678,6 +721,28 @@ tr:hover td{background:rgba(128,128,128,.04);}
       <button class="btn btn-danger" onclick="deleteStudent()" style="margin-right:auto;">🗑 Supprimer</button>
       <button class="btn btn-ghost" onclick="closeModal('edit-student')">Annuler</button>
       <button class="btn btn-primary" onclick="saveEditStudent()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL AJOUT PAIEMENT ===== -->
+<div class="modal-overlay" id="modal-add-paiement">
+  <div class="modal"><h2>💰 Nouveau paiement</h2>
+    <input type="hidden" id="paiement-student-id"/>
+    <div id="paiement-student-label" style="font-size:.85rem;color:var(--muted);margin-bottom:14px;"></div>
+    <div class="form-row">
+      <div class="form-group"><label class="required">Date</label><input id="paiement-date" type="date"/><div class="field-error" id="err-paiement-date">Date requise</div></div>
+      <div class="form-group"><label class="required">Montant (€)</label><input id="paiement-montant" type="number" min="0" step="0.01" placeholder="0.00"/><div class="field-error" id="err-paiement-montant">Montant requis (> 0)</div></div>
+    </div>
+    <div class="form-group"><label>Méthode</label>
+      <select id="paiement-methode" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 11px;color:var(--text);font-size:.84rem;outline:none;">
+        <option>Espèces</option><option>CB</option><option>Chèque</option><option>Virement</option>
+      </select>
+    </div>
+    <div class="form-group"><label>Note (facultatif)</label><input id="paiement-note" placeholder="Ex: acompte, règlement examen…"/></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('add-paiement')">Annuler</button>
+      <button class="btn btn-primary" onclick="addPaiement()">Enregistrer</button>
     </div>
   </div>
 </div>
@@ -745,14 +810,14 @@ let moniteurs=[
   {id:2,name:'Marie'},
 ];
 let students=[
-  {id:1,fname:'Kévin',lname:'Moreau',phone:'0692 11 22 33',hours:18,exam:'Réussi',permis:'A2',comment:'Élève sérieux.',moniteurId:1,skills:{Freinage:'Maîtrisé',Virage:'Acquis',Maniabilité:'Acquis',Équilibre:'Maîtrisé',Signalisation:'Acquis',Vitesse:'Acquis'},history:[{date:nextDate(-20),type:'Conduite sur circuit',dur:1},{date:nextDate(-15),type:'Freinage d\'urgence',dur:1.5}]},
-  {id:2,fname:'Léa',lname:'Bernard',phone:'0693 44 55 66',hours:12,exam:'Examen planifié',permis:'A2',comment:'',moniteurId:1,skills:{Freinage:'Acquis',Virage:'En progression',Maniabilité:'En progression',Équilibre:'Acquis',Signalisation:'En progression',Vitesse:'En progression'},history:[{date:nextDate(-22),type:'Maniabilité',dur:1}]},
-  {id:3,fname:'Théo',lname:'Martin',phone:'0692 77 88 99',hours:8,exam:'En formation',permis:'A1',comment:'Débutant motivé.',moniteurId:2,skills:{Freinage:'En progression',Virage:'Débutant',Maniabilité:'En progression',Équilibre:'Débutant',Signalisation:'En progression',Vitesse:'Débutant'},history:[{date:nextDate(-12),type:'Cours théorique',dur:1}]},
-  {id:4,fname:'Amina',lname:'Ousseni',phone:'0693 12 34 56',hours:22,exam:'Réussi',permis:'A',comment:'Excellente élève.',moniteurId:2,skills:{Freinage:'Maîtrisé',Virage:'Maîtrisé',Maniabilité:'Maîtrisé',Équilibre:'Maîtrisé',Signalisation:'Acquis',Vitesse:'Maîtrisé'},history:[{date:nextDate(-30),type:'Autoroute',dur:2}]},
-  {id:5,fname:'Jordan',lname:'Hoarau',phone:'0692 98 76 54',hours:5,exam:'En formation',permis:'AM',comment:'',moniteurId:1,skills:{Freinage:'Débutant',Virage:'Débutant',Maniabilité:'Débutant',Équilibre:'Débutant',Signalisation:'En progression',Vitesse:'Débutant'},history:[]},
-  {id:6,fname:'Camille',lname:'Grondin',phone:'0693 65 43 21',hours:15,exam:'Échoué',permis:'A2',comment:'Retravailler freinage.',moniteurId:2,skills:{Freinage:'En progression',Virage:'En progression',Maniabilité:'Acquis',Équilibre:'En progression',Signalisation:'Acquis',Vitesse:'En progression'},history:[{date:nextDate(-8),type:'Freinage d\'urgence',dur:1.5}]},
-  {id:7,fname:'Yannick',lname:'Payet',phone:'0692 55 44 33',hours:20,exam:'Examen planifié',permis:'A',comment:'',moniteurId:1,skills:{Freinage:'Acquis',Virage:'Maîtrisé',Maniabilité:'Acquis',Équilibre:'Acquis',Signalisation:'Acquis',Vitesse:'Acquis'},history:[{date:nextDate(-5),type:'Autoroute',dur:2}]},
-  {id:8,fname:'Sonia',lname:'Fontaine',phone:'0693 22 11 00',hours:10,exam:'En formation',permis:'A1',comment:'',moniteurId:2,skills:{Freinage:'En progression',Virage:'En progression',Maniabilité:'En progression',Équilibre:'En progression',Signalisation:'Acquis',Vitesse:'En progression'},history:[{date:nextDate(-14),type:'Maniabilité',dur:1}]},
+  {id:1,fname:'Kévin',lname:'Moreau',phone:'0692 11 22 33',hours:18,exam:'Réussi',permis:'A2',tarifHoraire:50,comment:'Élève sérieux.',moniteurId:1,skills:{Freinage:'Maîtrisé',Virage:'Acquis',Maniabilité:'Acquis',Équilibre:'Maîtrisé',Signalisation:'Acquis',Vitesse:'Acquis'},history:[{date:nextDate(-20),type:'Conduite sur circuit',dur:1},{date:nextDate(-15),type:'Freinage d\'urgence',dur:1.5}]},
+  {id:2,fname:'Léa',lname:'Bernard',phone:'0693 44 55 66',hours:12,exam:'Examen planifié',permis:'A2',tarifHoraire:50,comment:'',moniteurId:1,skills:{Freinage:'Acquis',Virage:'En progression',Maniabilité:'En progression',Équilibre:'Acquis',Signalisation:'En progression',Vitesse:'En progression'},history:[{date:nextDate(-22),type:'Maniabilité',dur:1}]},
+  {id:3,fname:'Théo',lname:'Martin',phone:'0692 77 88 99',hours:8,exam:'En formation',permis:'A1',tarifHoraire:45,comment:'Débutant motivé.',moniteurId:2,skills:{Freinage:'En progression',Virage:'Débutant',Maniabilité:'En progression',Équilibre:'Débutant',Signalisation:'En progression',Vitesse:'Débutant'},history:[{date:nextDate(-12),type:'Cours théorique',dur:1}]},
+  {id:4,fname:'Amina',lname:'Ousseni',phone:'0693 12 34 56',hours:22,exam:'Réussi',permis:'A',tarifHoraire:55,comment:'Excellente élève.',moniteurId:2,skills:{Freinage:'Maîtrisé',Virage:'Maîtrisé',Maniabilité:'Maîtrisé',Équilibre:'Maîtrisé',Signalisation:'Acquis',Vitesse:'Maîtrisé'},history:[{date:nextDate(-30),type:'Autoroute',dur:2}]},
+  {id:5,fname:'Jordan',lname:'Hoarau',phone:'0692 98 76 54',hours:5,exam:'En formation',permis:'AM',tarifHoraire:40,comment:'',moniteurId:1,skills:{Freinage:'Débutant',Virage:'Débutant',Maniabilité:'Débutant',Équilibre:'Débutant',Signalisation:'En progression',Vitesse:'Débutant'},history:[]},
+  {id:6,fname:'Camille',lname:'Grondin',phone:'0693 65 43 21',hours:15,exam:'Échoué',permis:'A2',tarifHoraire:50,comment:'Retravailler freinage.',moniteurId:2,skills:{Freinage:'En progression',Virage:'En progression',Maniabilité:'Acquis',Équilibre:'En progression',Signalisation:'Acquis',Vitesse:'En progression'},history:[{date:nextDate(-8),type:'Freinage d\'urgence',dur:1.5}]},
+  {id:7,fname:'Yannick',lname:'Payet',phone:'0692 55 44 33',hours:20,exam:'Examen planifié',permis:'A',tarifHoraire:55,comment:'',moniteurId:1,skills:{Freinage:'Acquis',Virage:'Maîtrisé',Maniabilité:'Acquis',Équilibre:'Acquis',Signalisation:'Acquis',Vitesse:'Acquis'},history:[{date:nextDate(-5),type:'Autoroute',dur:2}]},
+  {id:8,fname:'Sonia',lname:'Fontaine',phone:'0693 22 11 00',hours:10,exam:'En formation',permis:'A1',tarifHoraire:45,comment:'',moniteurId:2,skills:{Freinage:'En progression',Virage:'En progression',Maniabilité:'En progression',Équilibre:'En progression',Signalisation:'Acquis',Vitesse:'En progression'},history:[{date:nextDate(-14),type:'Maniabilité',dur:1}]},
 ];
 let events=[
   {id:1,studentId:1,date:today(),time:'09:00',type:'Conduite sur circuit',dur:1,moniteurId:1},
@@ -770,8 +835,17 @@ let suivis=[
   {id:103,studentId:3,date:nextDate(-5),type:'Freinage d\'urgence',dur:1,moniteurId:2,skills:{Freinage:'En progression'},comportement:'😐 Neutre',securite:'⚠️ À améliorer',positif:'Réactions correctes sol sec.',ameliorer:'Panique sur sol mouillé.',objectif:'Réduire temps de réaction.'},
   {id:104,studentId:6,date:nextDate(-6),type:'Conduite en ville',dur:1.5,moniteurId:2,skills:{Signalisation:'Acquis'},comportement:'😟 Difficultés',securite:'⚠️ À améliorer',positif:'Bonne lecture panneaux.',ameliorer:'Manque de confiance en insertion.',objectif:'Reprendre manœuvres d\'insertion.'},
 ];
+// Paiements : chaque élève a plusieurs paiements (acomptes, règlements partiels…)
+// Montant en euros. methode = 'Espèces' | 'CB' | 'Chèque' | 'Virement'
+let paiements=[
+  {id:301,studentId:1,date:nextDate(-25),montant:500,methode:'CB',note:'Acompte inscription'},
+  {id:302,studentId:1,date:nextDate(-10),montant:400,methode:'Virement',note:''},
+  {id:303,studentId:2,date:nextDate(-18),montant:300,methode:'Espèces',note:'1er versement'},
+  {id:304,studentId:4,date:nextDate(-30),montant:1100,methode:'Virement',note:'Règlement complet'},
+  {id:305,studentId:7,date:nextDate(-12),montant:600,methode:'Chèque',note:''},
+];
 // Compteurs d'ID séparés par type de donnée (évite les conflits lors d'imports)
-let nextIds={students:200,events:200,suivis:200,moniteurs:200};
+let nextIds={students:200,events:200,suivis:200,moniteurs:200,paiements:400};
 function nouvelId(type){return nextIds[type]++;}
 let currentMoniteurId=1; // Moniteur connecté par défaut
 
@@ -783,7 +857,7 @@ const STORAGE_LIMIT=5*1024*1024;       // limite navigateur typique (5 Mo)
 const STORAGE_SAFE_LIMIT=4.5*1024*1024; // marge de sécurité 10%
 
 function saveData(){
-  const json=JSON.stringify({students,events,suivis,moniteurs,nextIds,currentMoniteurId});
+  const json=JSON.stringify({students,events,suivis,moniteurs,paiements,nextIds,currentMoniteurId});
   const size=new Blob([json]).size;
   try{
     // Refus préventif si trop gros (évite l'écriture partielle)
@@ -818,19 +892,25 @@ function loadData(){
     if(d){const p=JSON.parse(d);
       students=p.students||students;events=p.events||events;
       suivis=p.suivis||suivis;moniteurs=p.moniteurs||moniteurs;
+      // Paiements : introduits en v5 — fichier antérieur → tableau vide
+      paiements=p.paiements||[];
       if(p.nextIds)nextIds=p.nextIds;
-      else if(p.nextId)nextIds={students:p.nextId,events:p.nextId,suivis:p.nextId,moniteurs:p.nextId};
+      else if(p.nextId)nextIds={students:p.nextId,events:p.nextId,suivis:p.nextId,moniteurs:p.nextId,paiements:p.nextId};
+      // Assure la présence du compteur paiements même sur données v4
+      if(!nextIds.paiements)nextIds.paiements=400;
       currentMoniteurId=p.currentMoniteurId||currentMoniteurId;
     }
     // Migration : les élèves enregistrés avant l'ajout du champ "permis"
     // n'ont pas de valeur. On leur attribue 'A2' par défaut (permis le plus courant).
     students.forEach(s=>{if(!['AM','A1','A2','A'].includes(s.permis))s.permis='A2';});
+    // Migration v5 : les élèves sans tarif horaire → 50€ par défaut (tarif moyen Réunion)
+    students.forEach(s=>{if(typeof s.tarifHoraire!=='number'||s.tarifHoraire<0)s.tarifHoraire=50;});
   }catch(e){console.warn('Load failed',e);}
 }
 function updateStorageInfo(){
   try{
     // On calcule sur les données in-memory (reflète ce qui devrait être persisté)
-    const payload=JSON.stringify({students,events,suivis,moniteurs,nextIds,currentMoniteurId});
+    const payload=JSON.stringify({students,events,suivis,moniteurs,paiements,nextIds,currentMoniteurId});
     const used=new Blob([payload]).size;
     const pct=Math.min(999,Math.round(used/STORAGE_LIMIT*100));
     const info=document.getElementById('storage-info');
@@ -871,7 +951,7 @@ window.addEventListener('beforeunload',e=>{
 
 // ===== EXPORT / IMPORT =====
 function exportData(){
-  const data={version:4,exported:new Date().toISOString(),students,events,suivis,moniteurs,nextIds};
+  const data={version:5,exported:new Date().toISOString(),students,events,suivis,moniteurs,paiements,nextIds};
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
@@ -887,13 +967,18 @@ function importData(event){
     try{
       const d=JSON.parse(e.target.result);
       if(!d.students)throw new Error('Format invalide');
-      if(!confirm(`Importer ${d.students.length} élèves, ${d.events?.length||0} cours, ${d.suivis?.length||0} fiches ?\nVos données actuelles seront remplacées.`))return;
+      if(!confirm(`Importer ${d.students.length} élèves, ${d.events?.length||0} cours, ${d.suivis?.length||0} fiches, ${d.paiements?.length||0} paiements ?\nVos données actuelles seront remplacées.`))return;
       students=d.students;events=d.events||[];suivis=d.suivis||[];
       moniteurs=d.moniteurs||moniteurs;
+      // Paiements : fichier antérieur à v5 → tableau vide (pas de paiement historisé)
+      paiements=d.paiements||[];
       if(d.nextIds)nextIds=d.nextIds;
-      else if(d.nextId)nextIds={students:d.nextId,events:d.nextId,suivis:d.nextId,moniteurs:d.nextId};
+      else if(d.nextId)nextIds={students:d.nextId,events:d.nextId,suivis:d.nextId,moniteurs:d.nextId,paiements:d.nextId};
+      if(!nextIds.paiements)nextIds.paiements=400;
       // Migration permis : fichier exporté avant la v4 → pas de champ permis → défaut A2
       students.forEach(s=>{if(!['AM','A1','A2','A'].includes(s.permis))s.permis='A2';});
+      // Migration tarif : v4 et antérieur → 50€ par défaut
+      students.forEach(s=>{if(typeof s.tarifHoraire!=='number'||s.tarifHoraire<0)s.tarifHoraire=50;});
       saveData();renderDashboard();
       showToast(`Import réussi : ${students.length} élèves ✅`);
     }catch(err){showToast('Fichier invalide ou corrompu','error');}
@@ -907,6 +992,7 @@ function openExportModal(){
       <div>👥 <strong>${students.length}</strong> élèves</div>
       <div>📅 <strong>${events.length}</strong> cours planifiés</div>
       <div>📋 <strong>${suivis.length}</strong> fiches de séance</div>
+      <div>💰 <strong>${paiements.length}</strong> paiement${paiements.length>1?'s':''}</div>
       <div>👤 <strong>${moniteurs.length}</strong> moniteur${moniteurs.length>1?'s':''}</div>
     </div>`;
   openModal('export-data');
@@ -1045,6 +1131,27 @@ function renderDashboard(){
   document.getElementById('kpi-passed').textContent=passed;
   document.getElementById('kpi-rate').textContent=students.length?Math.round(passed/students.length*100)+'%':'—';
   document.getElementById('kpi-ready').textContent=ready.length;
+  // === Bloc financier ===
+  // Créances : on additionne tous les soldes POSITIFS (= ce que chaque élève doit encore)
+  // Les crédits (élèves ayant trop versé) ne sont PAS compensés — on veut voir la dette brute.
+  let creances=0;
+  let elevesEnDette=0;
+  students.forEach(s=>{
+    const solde=soldeEleve(s);
+    if(solde>0.005){creances+=solde;elevesEnDette++;}
+  });
+  document.getElementById('dash-creances').textContent=fmtEuro(creances);
+  document.getElementById('dash-creances-eleves').textContent=elevesEnDette;
+  document.getElementById('dash-creances-count').textContent=elevesEnDette?`${elevesEnDette} élève${elevesEnDette>1?'s':''}`:'aucun';
+  // CA du mois : somme des paiements dont la date tombe dans le mois en cours
+  const now=new Date();
+  const moisKey=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const paiementsDuMois=paiements.filter(p=>p.date&&p.date.startsWith(moisKey));
+  const caMois=paiementsDuMois.reduce((sum,p)=>sum+(p.montant||0),0);
+  const moisLabel=now.toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+  document.getElementById('dash-ca').textContent=fmtEuro(caMois);
+  document.getElementById('dash-ca-count').textContent=`${paiementsDuMois.length} paiement${paiementsDuMois.length>1?'s':''}`;
+  document.getElementById('dash-ca-sub').textContent=`encaissé en ${moisLabel}`;
   document.getElementById('ready-alerts').innerHTML=ready.map(s=>`
     <div class="ready-alert">🏆 <strong>${s.fname} ${s.lname}</strong> a toutes ses compétences ok — <span style="color:var(--success)">prêt pour l'examen !</span>
     <button class="btn btn-ghost btn-sm" style="margin-left:auto;" onclick="openStudentDetail(${s.id})">Voir fiche</button></div>`).join('');
@@ -1136,6 +1243,15 @@ function openStudentDetail(id, opts){
   // Combien de fiches on affiche : tout en impression, sinon les 3 plus récentes
   const fichesToShow=opts.printMode?sNotes:sNotes.slice(0,3);
   const ready=isReadyForExam(s)&&s.exam!=='Réussi';
+  // === Paiements de l'élève ===
+  // Calculs : dû = heures × tarif, payé = somme des paiements, solde = différence
+  const sPaiements=paiements.filter(p=>p.studentId===id).sort((a,b)=>b.date.localeCompare(a.date));
+  const du=totalDu(s);
+  const paye=totalPaye(id);
+  const solde=du-paye; // positif = l'élève doit encore / négatif = crédit
+  // Classe CSS pour le KPI solde : couleur selon situation
+  const soldeClass=solde>0.005?'solde-dette':(solde<-0.005?'solde-credit':'solde-ok');
+  const soldeLabel=solde>0.005?'Reste à payer':(solde<-0.005?'Crédit (trop versé)':'À jour');
   document.getElementById('student-detail-content').innerHTML=`
     <div class="detail-header">
       <div class="detail-avatar" style="background:${c}20;color:${c}">${s.fname[0]+s.lname[0]}</div>
@@ -1180,6 +1296,38 @@ function openStudentDetail(id, opts){
             ${n.signatureEleve?`<div class="sig-mini"><span>🎓 Élève</span><img src="${n.signatureEleve}" alt="Signature élève"/></div>`:''}
           </div>`:''}
       </div>`).join(''):'<p style="color:var(--muted);font-size:.81rem;">Aucune fiche de séance.</p>'}
+    </div>
+    <div class="card" style="margin-top:14px;">
+      <div class="card-title">
+        <span>💰 Paiements</span>
+        <span style="font-size:.72rem;color:var(--muted);">Tarif : ${fmtEuro(s.tarifHoraire||50)} / heure</span>
+        <button class="btn btn-primary btn-sm no-print" onclick="openPaiementModal(${id})">+ Nouveau paiement</button>
+      </div>
+      <div class="paiement-kpis">
+        <div class="paiement-kpi">
+          <div class="pk-lbl">Montant dû</div>
+          <div class="pk-val">${fmtEuro(du)}</div>
+          <div style="font-size:.68rem;color:var(--muted);">${s.hours||0}h × ${fmtEuro(s.tarifHoraire||50)}</div>
+        </div>
+        <div class="paiement-kpi">
+          <div class="pk-lbl">Payé</div>
+          <div class="pk-val" style="color:var(--success);">${fmtEuro(paye)}</div>
+          <div style="font-size:.68rem;color:var(--muted);">${sPaiements.length} versement${sPaiements.length>1?'s':''}</div>
+        </div>
+        <div class="paiement-kpi ${soldeClass}">
+          <div class="pk-lbl">${soldeLabel}</div>
+          <div class="pk-val">${fmtEuro(Math.abs(solde))}</div>
+          <div style="font-size:.68rem;color:var(--muted);">${solde>0.005?'à encaisser':(solde<-0.005?'à rembourser':'tout est réglé')}</div>
+        </div>
+      </div>
+      ${sPaiements.length?`<div>${sPaiements.map(p=>`
+        <div class="paiement-row">
+          <span class="pr-date">${p.date}</span>
+          <span class="pr-methode">${p.methode||'—'}</span>
+          <span class="pr-note">${p.note?escapeHtml(p.note):''}</span>
+          <span class="pr-montant">+ ${fmtEuro(p.montant)}</span>
+          <button class="btn btn-danger btn-sm no-print" onclick="deletePaiement(${p.id},${id})">🗑</button>
+        </div>`).join('')}</div>`:'<p style="color:var(--muted);font-size:.81rem;">Aucun paiement enregistré.</p>'}
     </div>`;
 }
 
@@ -1202,6 +1350,83 @@ function printStudent(id){
   setTimeout(()=>window.print(),50);
 }
 
+// ===== PAIEMENTS =====
+// Coût total dû = heures effectuées × tarif horaire de l'élève.
+// Simple et transparent : toute heure déjà faite est facturable.
+function totalDu(s){
+  const tarif=(typeof s.tarifHoraire==='number'&&s.tarifHoraire>=0)?s.tarifHoraire:50;
+  return (s.hours||0)*tarif;
+}
+// Somme des paiements enregistrés pour un élève.
+function totalPaye(studentId){
+  return paiements.filter(p=>p.studentId===studentId).reduce((sum,p)=>sum+(p.montant||0),0);
+}
+// Reste à payer. Positif = doit encore, 0 = à jour, négatif = a trop versé (crédit).
+function soldeEleve(s){
+  return totalDu(s)-totalPaye(s.id);
+}
+// Formatage monétaire FR : 1 234,50 €
+function fmtEuro(n){
+  return (n||0).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+}
+
+// Ouvre le modal "Nouveau paiement" pour un élève donné.
+function openPaiementModal(studentId){
+  const s=students.find(x=>x.id===studentId);
+  if(!s){showToast('Élève introuvable','error');return;}
+  document.getElementById('paiement-student-id').value=studentId;
+  document.getElementById('paiement-student-label').textContent=`Pour : ${s.fname} ${s.lname}`;
+  // Pré-remplit avec la date du jour et un montant vide
+  document.getElementById('paiement-date').value=today();
+  document.getElementById('paiement-montant').value='';
+  document.getElementById('paiement-methode').value='Espèces';
+  document.getElementById('paiement-note').value='';
+  // Réinitialise l'affichage des erreurs de validation
+  ['paiement-date','paiement-montant'].forEach(id=>document.getElementById(id).classList.remove('error'));
+  ['err-paiement-date','err-paiement-montant'].forEach(id=>document.getElementById(id).classList.remove('show'));
+  openModal('add-paiement');
+}
+
+// Enregistre un nouveau paiement après validation.
+function addPaiement(){
+  const studentId=parseInt(document.getElementById('paiement-student-id').value);
+  const s=students.find(x=>x.id===studentId);
+  if(!s){showToast('Élève introuvable','error');return;}
+  const date=document.getElementById('paiement-date').value;
+  const montantRaw=parseFloat(document.getElementById('paiement-montant').value);
+  const methode=document.getElementById('paiement-methode').value;
+  const note=document.getElementById('paiement-note').value.trim();
+  // Validation : date non vide, montant numérique > 0
+  let ok=true;
+  ok=validateField('paiement-date','err-paiement-date',!!date)&&ok;
+  ok=validateField('paiement-montant','err-paiement-montant',isFinite(montantRaw)&&montantRaw>0)&&ok;
+  if(!ok)return;
+  paiements.push({
+    id:nouvelId('paiements'),
+    studentId,
+    date,
+    montant:Math.round(montantRaw*100)/100, // on garde 2 décimales max (centimes)
+    methode,
+    note
+  });
+  saveData();
+  closeModal('add-paiement');
+  showToast('Paiement enregistré ✅');
+  // Rafraîchit la fiche élève pour mettre à jour les KPIs et la liste
+  openStudentDetail(studentId);
+}
+
+// Supprime un paiement (avec confirmation — action irréversible).
+function deletePaiement(id,studentId){
+  const p=paiements.find(x=>x.id===id);
+  if(!p)return;
+  if(!confirm(`Supprimer le paiement du ${p.date} (${fmtEuro(p.montant)}) ?\nCette action est irréversible.`))return;
+  paiements=paiements.filter(x=>x.id!==id);
+  saveData();
+  showToast('Paiement supprimé');
+  openStudentDetail(studentId);
+}
+
 // ===== EDIT MODAL =====
 function openEditModal(id){
   const s=students.find(x=>x.id===id);if(!s)return;
@@ -1214,6 +1439,8 @@ function openEditModal(id){
   document.getElementById('edit-exam').value=s.exam;
   // Permis : si l'élève n'en a pas encore (données anciennes), on affiche A2 par défaut
   document.getElementById('edit-permis').value=PERMIS_VALUES.includes(s.permis)?s.permis:'A2';
+  // Tarif horaire : fallback 50€ si jamais défini
+  document.getElementById('edit-tarif').value=(typeof s.tarifHoraire==='number'&&s.tarifHoraire>=0)?s.tarifHoraire:50;
   document.getElementById('edit-comment').value=s.comment||'';
   document.getElementById('edit-moniteur-assign').value=s.moniteurId||currentMoniteurId;
   document.getElementById('edit-skills-inputs').innerHTML=SKILLS.map(sk=>`
@@ -1236,6 +1463,9 @@ function saveEditStudent(){
   s.exam=document.getElementById('edit-exam').value;
   const permisRaw=document.getElementById('edit-permis').value;
   s.permis=PERMIS_VALUES.includes(permisRaw)?permisRaw:(s.permis||'A2');
+  // Tarif horaire : on garde l'ancien si champ vide ou invalide
+  const tarifRaw=parseFloat(document.getElementById('edit-tarif').value);
+  s.tarifHoraire=(isFinite(tarifRaw)&&tarifRaw>=0)?tarifRaw:(s.tarifHoraire||50);
   s.comment=document.getElementById('edit-comment').value;
   s.moniteurId=parseInt(document.getElementById('edit-moniteur-assign').value)||s.moniteurId;
   SKILLS.forEach(sk=>{const v=document.getElementById('ep-'+sk).value;if(LEVELS.includes(v))s.skills[sk]=v;});
@@ -1248,25 +1478,28 @@ function deleteStudent(){
   // Compter les références avant suppression pour informer l'utilisateur
   const nbEvents=events.filter(e=>e.studentId===id).length;
   const nbSuivis=suivis.filter(f=>f.studentId===id).length;
+  const nbPaiements=paiements.filter(p=>p.studentId===id).length;
   let msg=`Supprimer définitivement ${s.fname} ${s.lname} ?`;
-  if(nbEvents||nbSuivis){
+  if(nbEvents||nbSuivis||nbPaiements){
     const parts=[];
     if(nbEvents)parts.push(`${nbEvents} cours`);
     if(nbSuivis)parts.push(`${nbSuivis} fiche${nbSuivis>1?'s':''} de suivi`);
-    msg+=`\n\nCela supprimera aussi : ${parts.join(' et ')}.`;
+    if(nbPaiements)parts.push(`${nbPaiements} paiement${nbPaiements>1?'s':''}`);
+    msg+=`\n\nCela supprimera aussi : ${parts.join(', ')}.`;
   }
   msg+=`\n\nCette action est irréversible.`;
   if(!confirm(msg))return;
   students=students.filter(x=>x.id!==id);
   events=events.filter(e=>e.studentId!==id);
   suivis=suivis.filter(f=>f.studentId!==id);
+  paiements=paiements.filter(p=>p.studentId!==id);
   // Réinitialiser les filtres qui pointaient vers cet élève (références orphelines)
   const fSuivi=document.getElementById('filter-suivi-student');
   if(fSuivi && parseInt(fSuivi.value)===id)fSuivi.value='';
   const fStats=document.getElementById('stats-student-select');
   if(fStats && parseInt(fStats.value)===id)fStats.value='';
   saveData();closeModal('edit-student');
-  showToast(`Élève supprimé ${nbEvents||nbSuivis?`(+${nbEvents+nbSuivis} liés)`:''}`);
+  showToast(`Élève supprimé ${nbEvents||nbSuivis||nbPaiements?`(+${nbEvents+nbSuivis+nbPaiements} liés)`:''}`);
   showPage('students',document.querySelectorAll('.nav-item')[1]);
 }
 
@@ -1735,11 +1968,15 @@ function addStudent(){
   const moniteurId=parseInt(document.getElementById('new-moniteur-assign').value)||currentMoniteurId;
   const permisRaw=document.getElementById('new-permis').value;
   const permis=PERMIS_VALUES.includes(permisRaw)?permisRaw:'A2';
-  students.push({id:nouvelId('students'),fname,lname,phone:document.getElementById('new-phone').value||'—',hours:parseInt(document.getElementById('new-hours').value)||0,exam:document.getElementById('new-exam').value,permis,comment:'',moniteurId,skills:{Freinage:'Débutant',Virage:'Débutant',Maniabilité:'Débutant',Équilibre:'Débutant',Signalisation:'Débutant',Vitesse:'Débutant'},history:[]});
+  // Tarif horaire : on accepte les nombres positifs (entier ou décimal). Défaut 50€ si vide/invalide.
+  const tarifRaw=parseFloat(document.getElementById('new-tarif').value);
+  const tarifHoraire=(isFinite(tarifRaw)&&tarifRaw>=0)?tarifRaw:50;
+  students.push({id:nouvelId('students'),fname,lname,phone:document.getElementById('new-phone').value||'—',hours:parseInt(document.getElementById('new-hours').value)||0,exam:document.getElementById('new-exam').value,permis,tarifHoraire,comment:'',moniteurId,skills:{Freinage:'Débutant',Virage:'Débutant',Maniabilité:'Débutant',Équilibre:'Débutant',Signalisation:'Débutant',Vitesse:'Débutant'},history:[]});
   saveData();closeModal('add-student');
   ['new-fname','new-lname','new-phone'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('new-hours').value=0;
   document.getElementById('new-permis').value='A2';
+  document.getElementById('new-tarif').value=50;
   showToast('Élève ajouté ✅');renderDashboard();
 }
 
