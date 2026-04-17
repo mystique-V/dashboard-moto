@@ -804,10 +804,10 @@ function renderStudentsTable(){
   const filterM=document.getElementById('filter-moniteur').value;
   populateMoniteurSelects();
   document.getElementById('filter-moniteur').value=filterM;
-  const q=document.getElementById('global-search').value.toLowerCase();
+  const q=normSearch(document.getElementById('global-search').value);
   let list=filter?students.filter(s=>s.exam===filter):[...students];
   if(filterM)list=list.filter(s=>s.moniteurId==filterM);
-  if(q)list=list.filter(s=>(s.fname+' '+s.lname).toLowerCase().includes(q)||(s.phone||'').includes(q));
+  if(q)list=list.filter(s=>normSearch(s.fname+' '+s.lname).includes(q)||normSearch(s.phone||'').includes(q));
   if(sortState.col){
     list.sort((a,b)=>{
       let va,vb;
@@ -1294,21 +1294,28 @@ function addStudent(){
 // Index courant dans les résultats (pour navigation clavier)
 let searchActiveIdx=-1;
 
+// Normalise une chaîne : minuscules + suppression des accents
+// Ex: "Kévin" → "kevin", ce qui permet de matcher "kev" dans "kévin"
+function normSearch(str){
+  return String(str??'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+}
+
 function globalSearch(q){
   // Si on est sur la page Élèves, on garde aussi le filtrage du tableau
   if(document.getElementById('page-students').classList.contains('active')){
     renderStudentsTable();
   }
   const box=document.getElementById('search-results');
-  const query=(q||'').trim().toLowerCase();
+  const query=normSearch((q||'').trim());
   // Moins de 2 caractères → on cache le dropdown
   if(query.length<2){box.classList.remove('open');box.innerHTML='';searchActiveIdx=-1;return;}
-  // Recherche : nom, prénom, téléphone
-  const matches=students.filter(s=>
-    (s.fname+' '+s.lname).toLowerCase().includes(query)||
-    (s.lname+' '+s.fname).toLowerCase().includes(query)||
-    (s.phone||'').toLowerCase().includes(query)
-  ).slice(0,8); // max 8 résultats
+  // Recherche insensible aux accents : nom, prénom, téléphone
+  const matches=students.filter(s=>{
+    const n=normSearch(s.fname+' '+s.lname);
+    const n2=normSearch(s.lname+' '+s.fname);
+    const p=normSearch(s.phone||'');
+    return n.includes(query)||n2.includes(query)||p.includes(query);
+  }).slice(0,8); // max 8 résultats
   if(matches.length===0){
     box.innerHTML=`<div class="search-results-empty">Aucun élève pour "${escapeHtml(q)}"</div>`;
   }else{
