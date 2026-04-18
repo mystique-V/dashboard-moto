@@ -452,6 +452,12 @@ tr:hover td{background:rgba(128,128,128,.04);}
             <div class="card-title"><span>📈 Chiffre d'affaires du mois</span><span style="font-size:.72rem;color:var(--muted);" id="dash-ca-count">—</span></div>
             <div class="kpi-value" id="dash-ca" style="color:var(--success);">—</div>
             <div class="kpi-sub" id="dash-ca-sub">—</div>
+            <!-- Export CSV : 2 boutons pour choisir la période. Format CSV avec
+                 BOM UTF-8 + séparateur ';' pour ouverture directe dans Excel FR. -->
+            <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;">
+              <button class="btn btn-ghost btn-sm" onclick="exportPaiementsCSV('mois')">📥 CSV du mois</button>
+              <button class="btn btn-ghost btn-sm" onclick="exportPaiementsCSV('tout')">📥 CSV complet</button>
+            </div>
           </div>
         </div>
         <div class="two-col">
@@ -461,6 +467,12 @@ tr:hover td{background:rgba(128,128,128,.04);}
         <div class="two-col">
           <div class="card"><div class="card-title"><span>Statuts examens</span></div><div class="chart-wrap"><canvas id="examChart"></canvas></div></div>
           <div class="card"><div class="card-title"><span>Séances / mois</span></div><div class="chart-wrap"><canvas id="hoursChart"></canvas></div></div>
+        </div>
+        <!-- Deuxième ligne de graphes : on sépare "activité pédagogique" (ci-dessus)
+             et "activité financière + typologie" (ci-dessous) pour clarifier la lecture. -->
+        <div class="two-col">
+          <div class="card"><div class="card-title"><span>💰 CA sur 12 mois</span></div><div class="chart-wrap"><canvas id="caChart"></canvas></div></div>
+          <div class="card"><div class="card-title"><span>🏍️ Répartition par permis</span></div><div class="chart-wrap"><canvas id="permisChart"></canvas></div></div>
         </div>
         <div class="card"><div class="card-title"><span>Élèves récents</span><button class="btn btn-ghost btn-sm" onclick="showPage('students',document.querySelectorAll('.nav-item')[1])">Voir tous →</button></div>
           <div class="table-wrap"><table><thead><tr><th>Élève</th><th>Heures</th><th>Niveau</th><th>Examen</th></tr></thead><tbody id="recent-students-table"></tbody></table></div>
@@ -481,6 +493,19 @@ tr:hover td{background:rgba(128,128,128,.04);}
           <select class="search-bar" id="filter-moniteur" onchange="renderStudentsTable()" style="width:auto;">
             <option value="">Tous les moniteurs</option>
           </select>
+          <!-- Filtre par situation financière : pratique pour trouver rapidement
+               les élèves à relancer (en dette) ou ceux ayant trop versé (crédit). -->
+          <select class="search-bar" id="filter-solde" onchange="renderStudentsTable()" style="width:auto;">
+            <option value="">Tous les soldes</option>
+            <option value="dette">💶 En dette</option>
+            <option value="ajour">✅ À jour</option>
+            <option value="credit">💚 En crédit</option>
+          </select>
+          <!-- Compteur de résultats : se met à jour à chaque filtre/recherche.
+               Permet de voir d'un coup d'œil si les filtres sont bien ciblés. -->
+          <span id="students-count" style="font-size:.78rem;color:var(--muted);margin-left:auto;"></span>
+          <!-- Bouton reset : caché par défaut, affiché dès qu'un filtre est actif -->
+          <button class="btn btn-ghost btn-sm" id="clear-filters-btn" onclick="clearStudentFilters()" style="display:none;">↺ Réinitialiser</button>
         </div>
         <div class="card table-wrap">
           <table>
@@ -1339,6 +1364,23 @@ function renderDashboard(){
   const months=[];const counts=[];
   for(let i=5;i>=0;i--){const d=new Date();d.setMonth(d.getMonth()-i);const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;months.push(d.toLocaleDateString('fr-FR',{month:'short'}));counts.push(suivis.filter(f=>f.date.startsWith(key)).length);}
   renderLine('hoursChart',months,counts);
+  // Graphique CA sur 12 mois (barres vertes) :
+  // on parcourt les 12 derniers mois (en comptant le mois en cours) et on
+  // additionne les paiements dont la date commence par la clé "YYYY-MM".
+  const caLabels=[];const caValues=[];
+  for(let i=11;i>=0;i--){
+    const d=new Date();d.setDate(1);d.setMonth(d.getMonth()-i);
+    const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    caLabels.push(d.toLocaleDateString('fr-FR',{month:'short'}));
+    caValues.push(paiements.filter(p=>p.date&&p.date.startsWith(key)).reduce((s,p)=>s+(p.montant||0),0));
+  }
+  renderBar('caChart',caLabels,caValues,'#10b981');
+  // Graphique répartition permis (donut) :
+  // on compte combien d'élèves ont chaque type de permis et on réutilise
+  // renderDonut. Les couleurs suivent la charte des badges permis.
+  const permisTypes=['AM','A1','A2','A'];
+  const permisCounts=permisTypes.map(p=>students.filter(s=>(s.permis||'A2')===p).length);
+  renderDonut('permisChart',permisTypes,permisCounts,['#94a3b8','#3b82f6','#8b5cf6','#ef4444']);
   // Recent students
   document.getElementById('recent-students-table').innerHTML=students.slice(0,5).map(s=>{
     const c=COLORS[s.id%COLORS.length];
@@ -1360,13 +1402,29 @@ function renderStudentsTable(){
   const filter=document.getElementById('filter-exam').value;
   const filterP=document.getElementById('filter-permis').value;
   const filterM=document.getElementById('filter-moniteur').value;
+  const filterS=document.getElementById('filter-solde').value;
   populateMoniteurSelects();
   document.getElementById('filter-moniteur').value=filterM;
   const q=normSearch(document.getElementById('global-search').value);
   let list=filter?students.filter(s=>s.exam===filter):[...students];
   if(filterP)list=list.filter(s=>(s.permis||'A2')===filterP);
   if(filterM)list=list.filter(s=>s.moniteurId==filterM);
-  if(q)list=list.filter(s=>normSearch(s.fname+' '+s.lname).includes(q)||normSearch(s.phone||'').includes(q));
+  // Filtre par situation financière :
+  //   dette  → solde > 0 (l'élève doit encore de l'argent)
+  //   ajour  → solde ≈ 0 (à quelques centimes près, pour éviter les soucis d'arrondi)
+  //   credit → solde < 0 (l'élève a trop versé)
+  if(filterS){
+    list=list.filter(s=>{
+      const solde=soldeEleve(s);
+      if(filterS==='dette')return solde>0.005;
+      if(filterS==='ajour')return Math.abs(solde)<=0.005;
+      if(filterS==='credit')return solde<-0.005;
+      return true;
+    });
+  }
+  // Recherche texte : on cherche aussi dans l'email maintenant (utile si on
+  // se souvient d'une adresse mais pas du nom complet).
+  if(q)list=list.filter(s=>normSearch(s.fname+' '+s.lname).includes(q)||normSearch(s.phone||'').includes(q)||normSearch(s.email||'').includes(q));
   if(sortState.col){
     list.sort((a,b)=>{
       let va,vb;
@@ -1388,6 +1446,29 @@ function renderStudentsTable(){
       <td><button class="btn btn-ghost btn-sm" onclick="openStudentDetail(${s.id})">Fiche</button></td>
     </tr>`;
   }).join('')||'<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:22px">Aucun élève.</td></tr>';
+  // Mise à jour du compteur et du bouton reset :
+  // - compteur toujours affiché (ex: "3 élèves affichés sur 8")
+  // - reset visible uniquement si au moins un filtre/recherche est actif
+  const total=students.length;
+  const nb=list.length;
+  const cpt=document.getElementById('students-count');
+  if(cpt){
+    cpt.textContent=nb===total?`${total} élève${total>1?'s':''}`:`${nb} sur ${total} élève${total>1?'s':''}`;
+  }
+  const aucunFiltre=!filter&&!filterP&&!filterM&&!filterS&&!q;
+  const btn=document.getElementById('clear-filters-btn');
+  if(btn)btn.style.display=aucunFiltre?'none':'';
+}
+
+// Réinitialise tous les filtres et la recherche, puis ré-affiche le tableau.
+// Appelé par le bouton "↺ Réinitialiser".
+function clearStudentFilters(){
+  document.getElementById('filter-exam').value='';
+  document.getElementById('filter-permis').value='';
+  document.getElementById('filter-moniteur').value='';
+  document.getElementById('filter-solde').value='';
+  document.getElementById('global-search').value='';
+  renderStudentsTable();
 }
 
 // ===== STUDENT DETAIL =====
@@ -1586,6 +1667,65 @@ function deletePaiement(id,studentId){
   saveData();
   showToast('Paiement supprimé');
   openStudentDetail(studentId);
+}
+
+// ===== EXPORT CSV DES PAIEMENTS =====
+// Exporte les paiements au format CSV (un fichier que la plupart des tableurs
+// ouvrent directement — Excel, LibreOffice Calc, Google Sheets).
+// Choix techniques :
+//   • BOM UTF-8 (\uFEFF) en début pour qu'Excel affiche les accents correctement
+//   • Séparateur ';' (standard français) — Excel FR l'interprète nativement
+//   • Montant formaté avec virgule décimale (ex: "50,00") — convention FR
+//   • Champs contenant ';' ou '"' sont entourés de guillemets doubles
+//   • Fin de ligne \r\n (compatible Excel Windows ET Mac)
+// Paramètre scope :
+//   • 'mois' → uniquement les paiements du mois en cours
+//   • 'tout' → tous les paiements
+function exportPaiementsCSV(scope){
+  // Sélection des paiements selon la portée
+  let rows=paiements;
+  let suffixe='complet';
+  if(scope==='mois'){
+    const now=new Date();
+    const key=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+    rows=paiements.filter(p=>p.date&&p.date.startsWith(key));
+    suffixe=key; // ex: "2026-04"
+  }
+  if(!rows.length){
+    showToast(scope==='mois'?'Aucun paiement ce mois-ci':'Aucun paiement à exporter','error');
+    return;
+  }
+  // Fonction utilitaire pour échapper un champ CSV :
+  //   • Les guillemets internes sont doublés ("")
+  //   • Le champ est entouré de guillemets si il contient ; " \r ou \n
+  const esc=v=>{
+    const s=String(v??'');
+    return /[;"\r\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s;
+  };
+  // En-têtes des colonnes (ordre lisible pour un comptable)
+  const entete=['Date','Élève','Montant (€)','Méthode','Note'];
+  // Construction des lignes, triées par date croissante pour faciliter la lecture
+  const lignes=rows.slice().sort((a,b)=>(a.date||'').localeCompare(b.date||'')).map(p=>{
+    const s=students.find(x=>x.id===p.studentId);
+    const nom=s?`${s.fname} ${s.lname}`:'(élève supprimé)';
+    // Montant en FR : "50.00" → "50,00" (pour éviter qu'Excel n'interprète le '.' comme séparateur de milliers)
+    const montant=(p.montant||0).toFixed(2).replace('.',',');
+    return [p.date||'',nom,montant,p.methode||'',p.note||''].map(esc).join(';');
+  });
+  // Assemblage final : BOM + en-tête + lignes, séparés par CRLF
+  const csv='\uFEFF'+[entete.map(esc).join(';'),...lignes].join('\r\n');
+  // Déclenchement du téléchargement via un blob (pas de serveur nécessaire)
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download=`paiements-${suffixe}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  // On libère l'URL au bout d'une seconde (le navigateur a eu le temps de déclencher le DL)
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+  showToast(`${rows.length} paiement${rows.length>1?'s':''} exporté${rows.length>1?'s':''} 📥`);
 }
 
 // ===== CONTACT ÉLÈVE (Email / SMS) =====
@@ -2241,6 +2381,29 @@ function renderLine(id,labels,data){
   if(CI[id])CI[id].destroy();
   const tc=darkMode?'#94a3b8':'#64748b';const gc=darkMode?'#2e3248':'#e2e8f0';
   CI[id]=new Chart(document.getElementById(id).getContext('2d'),{type:'line',data:{labels,datasets:[{data,borderColor:'#f97316',backgroundColor:'rgba(249,115,22,.1)',tension:.4,fill:true,pointBackgroundColor:'#f97316'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:tc},grid:{color:gc}},y:{ticks:{color:tc},grid:{color:gc}}}}});
+}
+// Graphique en barres (ex : CA mensuel).
+// On affiche l'unité "€" dans le tooltip pour éviter la confusion avec un nombre
+// de cours, et on formate les ticks de l'axe Y en style européen ("1 200 €").
+function renderBar(id,labels,data,color){
+  if(CI[id])CI[id].destroy();
+  const tc=darkMode?'#94a3b8':'#64748b';const gc=darkMode?'#2e3248':'#e2e8f0';
+  const col=color||'#10b981';
+  CI[id]=new Chart(document.getElementById(id).getContext('2d'),{
+    type:'bar',
+    data:{labels,datasets:[{data,backgroundColor:col+'bb',borderColor:col,borderWidth:1,borderRadius:4}]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{label:ctx=>fmtEuro(ctx.parsed.y)}}
+      },
+      scales:{
+        x:{ticks:{color:tc},grid:{color:gc}},
+        y:{ticks:{color:tc,callback:v=>new Intl.NumberFormat('fr-FR').format(v)+' €'},grid:{color:gc},beginAtZero:true}
+      }
+    }
+  });
 }
 
 // ===== STUDENTS CRUD =====
