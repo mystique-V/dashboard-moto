@@ -267,9 +267,9 @@ tr:hover td{background:rgba(128,128,128,.04);}
 /* ===== VUE CARTES pour la liste des élèves sous ~700px =====
    À cette taille, un tableau à 7 colonnes devient illisible (scroll horizontal).
    On transforme chaque <tr> en carte grâce à CSS Grid : on cache le <thead>
-   et on réarrange les cellules en zones nommées. L'utilisateur voit d'un coup
-   d'œil : nom + permis + badge examen, téléphone, heures/niveau, moniteur,
-   et le bouton "Fiche" aligné à droite. Aucun changement HTML requis. */
+   et on réarrange les cellules en zones nommées. Pour compenser l'absence
+   d'entêtes de colonnes, on préfixe chaque badge par un petit label
+   ("Niveau", "Examen") afin qu'on comprenne à quoi il correspond. */
 @media(max-width:700px){
   #page-students .table-wrap{overflow-x:visible;}
   #page-students .table-wrap table,
@@ -283,35 +283,50 @@ tr:hover td{background:rgba(128,128,128,.04);}
       "phone phone phone"
       "hours level exam"
       "mon   mon   mon";
-    row-gap:6px;column-gap:10px;
+    row-gap:8px;column-gap:10px;
     padding:12px;margin-bottom:10px;
     border:1px solid var(--border);border-radius:10px;
     background:var(--surface);
     align-items:center;
   }
   #page-students .table-wrap tr:hover td{background:transparent;} /* on neutralise le hover tableau */
-  #page-students .table-wrap td{display:flex;align-items:center;border:none;padding:0;min-height:0;}
+  #page-students .table-wrap td{display:flex;align-items:center;border:none;padding:0;min-height:0;gap:5px;}
+  /* Style commun pour les petits labels en "pseudo-header" devant chaque badge.
+     On utilise ::before pour ne pas toucher au HTML — le label apparaît
+     uniquement en vue mobile. */
+  #page-students .table-wrap td:nth-child(4):before,
+  #page-students .table-wrap td:nth-child(5):before,
+  #page-students .table-wrap td:nth-child(6):before{
+    font-size:.63rem;color:var(--muted);text-transform:uppercase;font-weight:600;letter-spacing:.3px;
+  }
   /* Chaque td prend sa place dans la grille : on s'appuie sur l'ordre du HTML
      (name, phone, hours, level, exam, moniteur, action) */
   #page-students .table-wrap td:nth-child(1){grid-area:name;font-weight:600;font-size:.92rem;}
   #page-students .table-wrap td:nth-child(2){grid-area:phone;color:var(--muted);font-size:.76rem;}
-  #page-students .table-wrap td:nth-child(2):before{content:'📞 ';margin-right:3px;}
+  #page-students .table-wrap td:nth-child(2):before{content:'📞';margin-right:3px;}
   #page-students .table-wrap td:nth-child(3){grid-area:hours;font-size:.78rem;}
-  #page-students .table-wrap td:nth-child(3):before{content:'⏱️ ';margin-right:3px;}
+  #page-students .table-wrap td:nth-child(3):before{content:'⏱️';margin-right:3px;}
   #page-students .table-wrap td:nth-child(4){grid-area:level;}
+  #page-students .table-wrap td:nth-child(4):before{content:'Niveau';}
   #page-students .table-wrap td:nth-child(5){grid-area:exam;justify-content:flex-end;}
+  #page-students .table-wrap td:nth-child(5):before{content:'Examen';}
   #page-students .table-wrap td:nth-child(6){grid-area:mon;font-size:.72rem;}
+  #page-students .table-wrap td:nth-child(6):before{content:'Moniteur';}
   #page-students .table-wrap td:nth-child(7){grid-area:action;justify-content:flex-end;}
 }
 @media(max-width:480px){
   .kpi-grid{grid-template-columns:1fr;}
-  /* On NE cache plus la recherche : on la bascule sur une ligne dédiée
-     (la topbar passe en flex-wrap) pour qu'elle soit toujours accessible. */
-  .topbar{flex-wrap:wrap;row-gap:8px;}
-  .topbar-right{width:100%;gap:6px;}
-  .topbar-right .search-bar{display:block !important;width:100% !important;font-size:.85rem;}
+  /* Topbar compacte sur UNE seule ligne : on masque le titre H1 (redondant
+     puisque la sidebar indique déjà la page active via le .nav-item surligné),
+     et on laisse tout s'aligner : hamburger + recherche (flex:1) + 🌙 + "+". */
+  .topbar{padding:8px 12px;gap:8px;}
+  .topbar h1{display:none;}
+  .topbar > :first-child{flex-shrink:0;} /* hamburger reste à taille minimale */
+  .topbar-right{flex:1;min-width:0;gap:6px;flex-wrap:nowrap;}
+  .topbar-right .search-bar{display:block !important;width:auto !important;font-size:.82rem;padding:6px 10px;}
   .search-wrapper{flex:1;min-width:0;}
-  .topbar-right .btn-primary{padding:6px 10px;font-size:.78rem;white-space:nowrap;}
+  .topbar-right .btn-primary{padding:6px 10px;font-size:.85rem;white-space:nowrap;flex-shrink:0;}
+  .theme-toggle{flex-shrink:0;}
   /* Libellé "Nouvel Élève" caché en mobile — on garde juste le "+" */
   .btn-label-long{display:none;}
   .week-grid{grid-template-columns:1fr 1fr;}
