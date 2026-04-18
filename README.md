@@ -157,6 +157,10 @@ const CACHE_VERSION = 'moto-ecole-v12'; // ← bumper ici
 - [ ] Fiche élève imprimable (PDF)
 - [ ] Rappels locaux (examens à venir, paiements en retard)
 - [ ] Multi-utilisateur (nécessiterait un backend)
+- [ ] Authentification + rôles (admin / moniteur / secrétaire)
+- [ ] Sync multi-appareil via Supabase
+- [ ] Forfaits prédéfinis
+- [ ] Fiche élève imprimable (PDF)
 
 ---
 
