@@ -230,6 +230,19 @@ tr:hover td{background:rgba(128,128,128,.04);}
 .toast.error{background:var(--danger);}
 .toast.warn{background:var(--warning);color:#1e293b;}
 /* ALERTS */
+/* Alerte générique — on décline la couleur par type via .alert-* plus bas */
+.alert-card{border-radius:10px;padding:12px 16px;margin-bottom:10px;display:flex;align-items:center;gap:10px;font-size:.82rem;flex-wrap:wrap;border:1px solid;}
+.alert-card strong{font-weight:700;}
+.alert-card .alert-actions{margin-left:auto;display:flex;gap:5px;flex-wrap:wrap;}
+/* Types : couleur de fond + bordure assortie */
+.alert-ready{background:rgba(16,185,129,.08);border-color:rgba(16,185,129,.3);}
+.alert-payment{background:rgba(249,115,22,.08);border-color:rgba(249,115,22,.3);}
+.alert-inactive{background:rgba(244,63,94,.08);border-color:rgba(244,63,94,.3);}
+.alert-info{background:rgba(99,102,241,.08);border-color:rgba(99,102,241,.3);}
+/* Titre de section "Alertes" plus compact quand il y en a */
+.alerts-section-title{font-size:.8rem;font-weight:700;color:var(--muted);margin:4px 0 8px;display:flex;align-items:center;gap:8px;}
+.alerts-section-title .alerts-count{background:var(--accent);color:#fff;padding:1px 8px;border-radius:99px;font-size:.68rem;}
+/* Compat rétro : .ready-alert reste supporté mais redirigé vers le nouveau look */
 .ready-alert{background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.3);border-radius:10px;padding:12px 16px;margin-bottom:10px;display:flex;align-items:center;gap:10px;font-size:.82rem;flex-wrap:wrap;}
 .storage-alert{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.4);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:.82rem;display:none;}
 .storage-alert.danger{background:rgba(244,63,94,.12);border-color:rgba(244,63,94,.5);color:var(--danger);}
@@ -573,8 +586,9 @@ tr:hover td{background:rgba(128,128,128,.04);}
     </div>
     <div class="form-row">
       <div class="form-group"><label>Téléphone</label><input id="new-phone" placeholder="0692…"/></div>
-      <div class="form-group"><label>Heures effectuées</label><input id="new-hours" type="number" value="0" min="0"/></div>
+      <div class="form-group"><label>Email</label><input id="new-email" type="email" placeholder="elève@exemple.fr"/></div>
     </div>
+    <div class="form-group"><label>Heures effectuées</label><input id="new-hours" type="number" value="0" min="0"/></div>
     <div class="form-row">
       <div class="form-group"><label>Statut examen</label><select id="new-exam"><option>En formation</option><option>Examen planifié</option><option>Réussi</option><option>Échoué</option></select></div>
       <div class="form-group"><label>Type de permis</label><select id="new-permis">
@@ -699,8 +713,9 @@ tr:hover td{background:rgba(128,128,128,.04);}
     </div>
     <div class="form-row">
       <div class="form-group"><label>Téléphone</label><input id="edit-phone"/></div>
-      <div class="form-group"><label>Heures effectuées</label><input id="edit-hours" type="number" min="0"/></div>
+      <div class="form-group"><label>Email</label><input id="edit-email" type="email" placeholder="elève@exemple.fr"/></div>
     </div>
+    <div class="form-group"><label>Heures effectuées</label><input id="edit-hours" type="number" min="0"/></div>
     <div class="form-row">
       <div class="form-group"><label>Statut examen</label><select id="edit-exam"><option>En formation</option><option>Examen planifié</option><option>Réussi</option><option>Échoué</option></select></div>
       <div class="form-group"><label>Type de permis</label><select id="edit-permis">
@@ -743,6 +758,41 @@ tr:hover td{background:rgba(128,128,128,.04);}
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('add-paiement')">Annuler</button>
       <button class="btn btn-primary" onclick="addPaiement()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL CONTACTER L'ÉLÈVE ===== -->
+<!-- Permet d'envoyer un email (mailto:) ou SMS (sms:) à un élève via un modèle pré-rempli.
+     N'envoie RIEN directement : ouvre l'app mail/SMS du téléphone avec le texte déjà prêt. -->
+<div class="modal-overlay" id="modal-contact">
+  <div class="modal"><h2>📨 Contacter l'élève</h2>
+    <input type="hidden" id="contact-student-id"/>
+    <div id="contact-student-label" style="font-size:.85rem;color:var(--muted);margin-bottom:12px;"></div>
+    <!-- Sélecteur de canal (Email / SMS) sous forme de boutons d'onglet -->
+    <div class="section-label" style="margin-top:0;">Canal</div>
+    <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;">
+      <button type="button" class="btn btn-ghost" id="contact-tab-sms" onclick="setContactCanal('sms')">📲 SMS</button>
+      <button type="button" class="btn btn-ghost" id="contact-tab-email" onclick="setContactCanal('email')">📧 Email</button>
+    </div>
+    <!-- Destinataire affiché pour transparence (téléphone ou email selon canal) -->
+    <div id="contact-recipient" style="font-size:.78rem;color:var(--muted);margin-bottom:10px;"></div>
+    <!-- Choix du modèle de message -->
+    <div class="form-group"><label>Modèle de message</label>
+      <select id="contact-template" onchange="applyContactTemplate()">
+        <option value="rappel-cours">📅 Rappel de cours</option>
+        <option value="relance-paiement">💰 Relance paiement</option>
+        <option value="invitation-examen">🏆 Invitation examen</option>
+        <option value="libre">✏️ Message libre</option>
+      </select>
+    </div>
+    <!-- Sujet (email uniquement, masqué pour SMS) -->
+    <div class="form-group" id="contact-subject-group"><label>Objet</label><input id="contact-subject"/></div>
+    <!-- Message éditable : l'utilisateur peut toujours ajuster avant d'envoyer -->
+    <div class="form-group"><label>Message</label><textarea id="contact-message" style="min-height:120px;"></textarea></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('contact')">Annuler</button>
+      <button class="btn btn-primary" onclick="sendContact()">📤 Ouvrir dans <span id="contact-send-label">SMS</span></button>
     </div>
   </div>
 </div>
@@ -810,14 +860,14 @@ let moniteurs=[
   {id:2,name:'Marie'},
 ];
 let students=[
-  {id:1,fname:'Kévin',lname:'Moreau',phone:'0692 11 22 33',hours:18,exam:'Réussi',permis:'A2',tarifHoraire:50,comment:'Élève sérieux.',moniteurId:1,skills:{Freinage:'Maîtrisé',Virage:'Acquis',Maniabilité:'Acquis',Équilibre:'Maîtrisé',Signalisation:'Acquis',Vitesse:'Acquis'},history:[{date:nextDate(-20),type:'Conduite sur circuit',dur:1},{date:nextDate(-15),type:'Freinage d\'urgence',dur:1.5}]},
-  {id:2,fname:'Léa',lname:'Bernard',phone:'0693 44 55 66',hours:12,exam:'Examen planifié',permis:'A2',tarifHoraire:50,comment:'',moniteurId:1,skills:{Freinage:'Acquis',Virage:'En progression',Maniabilité:'En progression',Équilibre:'Acquis',Signalisation:'En progression',Vitesse:'En progression'},history:[{date:nextDate(-22),type:'Maniabilité',dur:1}]},
-  {id:3,fname:'Théo',lname:'Martin',phone:'0692 77 88 99',hours:8,exam:'En formation',permis:'A1',tarifHoraire:45,comment:'Débutant motivé.',moniteurId:2,skills:{Freinage:'En progression',Virage:'Débutant',Maniabilité:'En progression',Équilibre:'Débutant',Signalisation:'En progression',Vitesse:'Débutant'},history:[{date:nextDate(-12),type:'Cours théorique',dur:1}]},
-  {id:4,fname:'Amina',lname:'Ousseni',phone:'0693 12 34 56',hours:22,exam:'Réussi',permis:'A',tarifHoraire:55,comment:'Excellente élève.',moniteurId:2,skills:{Freinage:'Maîtrisé',Virage:'Maîtrisé',Maniabilité:'Maîtrisé',Équilibre:'Maîtrisé',Signalisation:'Acquis',Vitesse:'Maîtrisé'},history:[{date:nextDate(-30),type:'Autoroute',dur:2}]},
-  {id:5,fname:'Jordan',lname:'Hoarau',phone:'0692 98 76 54',hours:5,exam:'En formation',permis:'AM',tarifHoraire:40,comment:'',moniteurId:1,skills:{Freinage:'Débutant',Virage:'Débutant',Maniabilité:'Débutant',Équilibre:'Débutant',Signalisation:'En progression',Vitesse:'Débutant'},history:[]},
-  {id:6,fname:'Camille',lname:'Grondin',phone:'0693 65 43 21',hours:15,exam:'Échoué',permis:'A2',tarifHoraire:50,comment:'Retravailler freinage.',moniteurId:2,skills:{Freinage:'En progression',Virage:'En progression',Maniabilité:'Acquis',Équilibre:'En progression',Signalisation:'Acquis',Vitesse:'En progression'},history:[{date:nextDate(-8),type:'Freinage d\'urgence',dur:1.5}]},
-  {id:7,fname:'Yannick',lname:'Payet',phone:'0692 55 44 33',hours:20,exam:'Examen planifié',permis:'A',tarifHoraire:55,comment:'',moniteurId:1,skills:{Freinage:'Acquis',Virage:'Maîtrisé',Maniabilité:'Acquis',Équilibre:'Acquis',Signalisation:'Acquis',Vitesse:'Acquis'},history:[{date:nextDate(-5),type:'Autoroute',dur:2}]},
-  {id:8,fname:'Sonia',lname:'Fontaine',phone:'0693 22 11 00',hours:10,exam:'En formation',permis:'A1',tarifHoraire:45,comment:'',moniteurId:2,skills:{Freinage:'En progression',Virage:'En progression',Maniabilité:'En progression',Équilibre:'En progression',Signalisation:'Acquis',Vitesse:'En progression'},history:[{date:nextDate(-14),type:'Maniabilité',dur:1}]},
+  {id:1,fname:'Kévin',lname:'Moreau',phone:'0692 11 22 33',email:'kevin.moreau@example.re',hours:18,exam:'Réussi',permis:'A2',tarifHoraire:50,comment:'Élève sérieux.',moniteurId:1,skills:{Freinage:'Maîtrisé',Virage:'Acquis',Maniabilité:'Acquis',Équilibre:'Maîtrisé',Signalisation:'Acquis',Vitesse:'Acquis'},history:[{date:nextDate(-20),type:'Conduite sur circuit',dur:1},{date:nextDate(-15),type:'Freinage d\'urgence',dur:1.5}]},
+  {id:2,fname:'Léa',lname:'Bernard',phone:'0693 44 55 66',email:'lea.bernard@example.re',hours:12,exam:'Examen planifié',permis:'A2',tarifHoraire:50,comment:'',moniteurId:1,skills:{Freinage:'Acquis',Virage:'En progression',Maniabilité:'En progression',Équilibre:'Acquis',Signalisation:'En progression',Vitesse:'En progression'},history:[{date:nextDate(-22),type:'Maniabilité',dur:1}]},
+  {id:3,fname:'Théo',lname:'Martin',phone:'0692 77 88 99',email:'',hours:8,exam:'En formation',permis:'A1',tarifHoraire:45,comment:'Débutant motivé.',moniteurId:2,skills:{Freinage:'En progression',Virage:'Débutant',Maniabilité:'En progression',Équilibre:'Débutant',Signalisation:'En progression',Vitesse:'Débutant'},history:[{date:nextDate(-12),type:'Cours théorique',dur:1}]},
+  {id:4,fname:'Amina',lname:'Ousseni',phone:'0693 12 34 56',email:'amina.o@example.re',hours:22,exam:'Réussi',permis:'A',tarifHoraire:55,comment:'Excellente élève.',moniteurId:2,skills:{Freinage:'Maîtrisé',Virage:'Maîtrisé',Maniabilité:'Maîtrisé',Équilibre:'Maîtrisé',Signalisation:'Acquis',Vitesse:'Maîtrisé'},history:[{date:nextDate(-30),type:'Autoroute',dur:2}]},
+  {id:5,fname:'Jordan',lname:'Hoarau',phone:'0692 98 76 54',email:'',hours:5,exam:'En formation',permis:'AM',tarifHoraire:40,comment:'',moniteurId:1,skills:{Freinage:'Débutant',Virage:'Débutant',Maniabilité:'Débutant',Équilibre:'Débutant',Signalisation:'En progression',Vitesse:'Débutant'},history:[]},
+  {id:6,fname:'Camille',lname:'Grondin',phone:'0693 65 43 21',email:'camille.grondin@example.re',hours:15,exam:'Échoué',permis:'A2',tarifHoraire:50,comment:'Retravailler freinage.',moniteurId:2,skills:{Freinage:'En progression',Virage:'En progression',Maniabilité:'Acquis',Équilibre:'En progression',Signalisation:'Acquis',Vitesse:'En progression'},history:[{date:nextDate(-8),type:'Freinage d\'urgence',dur:1.5}]},
+  {id:7,fname:'Yannick',lname:'Payet',phone:'0692 55 44 33',email:'yannick.payet@example.re',hours:20,exam:'Examen planifié',permis:'A',tarifHoraire:55,comment:'',moniteurId:1,skills:{Freinage:'Acquis',Virage:'Maîtrisé',Maniabilité:'Acquis',Équilibre:'Acquis',Signalisation:'Acquis',Vitesse:'Acquis'},history:[{date:nextDate(-5),type:'Autoroute',dur:2}]},
+  {id:8,fname:'Sonia',lname:'Fontaine',phone:'0693 22 11 00',email:'',hours:10,exam:'En formation',permis:'A1',tarifHoraire:45,comment:'',moniteurId:2,skills:{Freinage:'En progression',Virage:'En progression',Maniabilité:'En progression',Équilibre:'En progression',Signalisation:'Acquis',Vitesse:'En progression'},history:[{date:nextDate(-14),type:'Maniabilité',dur:1}]},
 ];
 let events=[
   {id:1,studentId:1,date:today(),time:'09:00',type:'Conduite sur circuit',dur:1,moniteurId:1},
@@ -905,6 +955,8 @@ function loadData(){
     students.forEach(s=>{if(!['AM','A1','A2','A'].includes(s.permis))s.permis='A2';});
     // Migration v5 : les élèves sans tarif horaire → 50€ par défaut (tarif moyen Réunion)
     students.forEach(s=>{if(typeof s.tarifHoraire!=='number'||s.tarifHoraire<0)s.tarifHoraire=50;});
+    // Migration v6 : champ email optionnel → chaîne vide par défaut
+    students.forEach(s=>{if(typeof s.email!=='string')s.email='';});
   }catch(e){console.warn('Load failed',e);}
 }
 function updateStorageInfo(){
@@ -951,7 +1003,7 @@ window.addEventListener('beforeunload',e=>{
 
 // ===== EXPORT / IMPORT =====
 function exportData(){
-  const data={version:5,exported:new Date().toISOString(),students,events,suivis,moniteurs,paiements,nextIds};
+  const data={version:6,exported:new Date().toISOString(),students,events,suivis,moniteurs,paiements,nextIds};
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
@@ -979,6 +1031,8 @@ function importData(event){
       students.forEach(s=>{if(!['AM','A1','A2','A'].includes(s.permis))s.permis='A2';});
       // Migration tarif : v4 et antérieur → 50€ par défaut
       students.forEach(s=>{if(typeof s.tarifHoraire!=='number'||s.tarifHoraire<0)s.tarifHoraire=50;});
+      // Migration email : v5 et antérieur → chaîne vide
+      students.forEach(s=>{if(typeof s.email!=='string')s.email='';});
       saveData();renderDashboard();
       showToast(`Import réussi : ${students.length} élèves ✅`);
     }catch(err){showToast('Fichier invalide ou corrompu','error');}
@@ -1124,6 +1178,111 @@ function validateField(inputId,errId,condition){
 function clearErrors(...ids){ids.forEach(id=>{document.getElementById(id)?.classList.remove('error','show');});}
 
 // ===== DASHBOARD =====
+// Seuils configurables pour les alertes — choisis pour rester pertinents sans spammer.
+// PAIEMENT_RETARD_JOURS : on considère qu'un élève est en retard si aucun paiement depuis ce nombre de jours.
+// PAIEMENT_SEUIL_EUROS : en-dessous de ce solde, pas d'alerte (on ignore les "petits" retards).
+// INACTIF_JOURS : aucun cours dans l'historique depuis ce nombre de jours → élève inactif.
+const PAIEMENT_RETARD_JOURS=30;
+const PAIEMENT_SEUIL_EUROS=100;
+const INACTIF_JOURS=21;
+
+// Retourne le nombre de jours entre aujourd'hui et une date YYYY-MM-DD (positif = date passée).
+function joursDepuis(dateStr){
+  if(!dateStr)return Infinity;
+  const d=parseLocalDate(dateStr);
+  const now=new Date();
+  now.setHours(0,0,0,0);
+  return Math.floor((now-d)/(1000*60*60*24));
+}
+
+// Construit le HTML des alertes en combinant les 4 types.
+// On passe `ready` en paramètre car il est déjà calculé par renderDashboard (évite le recalcul).
+function buildDashboardAlerts(ready){
+  const alerts=[];
+
+  // 1. ÉLÈVES PRÊTS POUR L'EXAMEN (vert) — existe déjà, on le conserve
+  ready.forEach(s=>{
+    alerts.push({
+      type:'ready',
+      icon:'🏆',
+      html:`<strong>${escapeHtml(s.fname)} ${escapeHtml(s.lname)}</strong> a toutes ses compétences ok — <span style="color:var(--success)">prêt pour l'examen !</span>`,
+      actions:`<button class="btn btn-ghost btn-sm" onclick="openStudentDetail(${s.id})">Voir fiche</button>`
+    });
+  });
+
+  // 2. PAIEMENTS EN RETARD (orange) — solde > seuil ET (aucun paiement OU dernier > 30j)
+  students.forEach(s=>{
+    if(s.exam==='Réussi')return; // on ne relance pas les élèves qui ont déjà eu leur permis
+    const solde=soldeEleve(s);
+    if(solde<=PAIEMENT_SEUIL_EUROS)return;
+    // Trouve le paiement le plus récent de cet élève
+    const sPay=paiements.filter(p=>p.studentId===s.id);
+    const dernierPaiement=sPay.length?sPay.map(p=>p.date).sort().pop():null;
+    const joursSansPaiement=dernierPaiement?joursDepuis(dernierPaiement):Infinity;
+    if(joursSansPaiement<PAIEMENT_RETARD_JOURS)return;
+    const libelle=dernierPaiement
+      ?`dernier paiement il y a ${joursSansPaiement} j`
+      :`aucun paiement enregistré`;
+    alerts.push({
+      type:'payment',
+      icon:'💶',
+      html:`<strong>${escapeHtml(s.fname)} ${escapeHtml(s.lname)}</strong> doit <strong style="color:var(--accent)">${fmtEuro(solde)}</strong> — ${libelle}`,
+      actions:`<button class="btn btn-ghost btn-sm" onclick="openContactModal(${s.id})">📨 Relancer</button><button class="btn btn-ghost btn-sm" onclick="openStudentDetail(${s.id})">Fiche</button>`
+    });
+  });
+
+  // 3. ÉLÈVES INACTIFS (rouge) — aucun cours depuis X jours ET pas réussi
+  students.forEach(s=>{
+    if(s.exam==='Réussi')return;
+    // Date du dernier cours dans l'historique (évite les cours futurs encore planifiés)
+    const hist=(s.history||[]).filter(h=>h.date<=today());
+    const dernierCours=hist.length?hist.map(h=>h.date).sort().pop():null;
+    const jours=dernierCours?joursDepuis(dernierCours):Infinity;
+    if(jours<INACTIF_JOURS)return;
+    // On plafonne pour éviter des affichages du type "il y a 9999 jours" quand pas d'historique
+    const libelle=dernierCours
+      ?`aucun cours depuis ${jours} j`
+      :`aucun cours enregistré`;
+    alerts.push({
+      type:'inactive',
+      icon:'💤',
+      html:`<strong>${escapeHtml(s.fname)} ${escapeHtml(s.lname)}</strong> — ${libelle}`,
+      actions:`<button class="btn btn-ghost btn-sm" onclick="openContactModal(${s.id})">📨 Contacter</button><button class="btn btn-ghost btn-sm" onclick="openStudentDetail(${s.id})">Fiche</button>`
+    });
+  });
+
+  // 4. COURS DE DEMAIN (bleu, info) — rappel pour préparer les fiches de séance
+  const demain=nextDate(1);
+  const coursDemain=events.filter(e=>e.date===demain);
+  if(coursDemain.length){
+    // Liste compacte des élèves concernés
+    const noms=coursDemain.map(e=>{
+      const s=students.find(x=>x.id===e.studentId);
+      return s?`${s.fname} ${s.lname[0]}.`:'?';
+    }).slice(0,4).join(', ');
+    const extra=coursDemain.length>4?` (+${coursDemain.length-4})`:'';
+    alerts.push({
+      type:'info',
+      icon:'📅',
+      html:`<strong>${coursDemain.length} cours demain</strong> — ${escapeHtml(noms)}${extra}`,
+      actions:`<button class="btn btn-ghost btn-sm" onclick="showPage('calendar',document.querySelectorAll('.nav-item')[2])">Voir agenda</button>`
+    });
+  }
+
+  // Si aucune alerte, on n'affiche rien (plutôt qu'un message "tout va bien" qui prend de la place).
+  if(alerts.length===0)return '';
+
+  // Titre du bloc + badge compteur, puis liste
+  const titre=`<div class="alerts-section-title">🔔 Alertes <span class="alerts-count">${alerts.length}</span></div>`;
+  const corps=alerts.map(a=>`
+    <div class="alert-card alert-${a.type}">
+      <span style="font-size:1.1rem;">${a.icon}</span>
+      <span style="flex:1;">${a.html}</span>
+      <span class="alert-actions">${a.actions}</span>
+    </div>`).join('');
+  return titre+corps;
+}
+
 function renderDashboard(){
   const passed=students.filter(s=>s.exam==='Réussi').length;
   const ready=students.filter(s=>s.exam!=='Réussi'&&isReadyForExam(s));
@@ -1152,9 +1311,10 @@ function renderDashboard(){
   document.getElementById('dash-ca').textContent=fmtEuro(caMois);
   document.getElementById('dash-ca-count').textContent=`${paiementsDuMois.length} paiement${paiementsDuMois.length>1?'s':''}`;
   document.getElementById('dash-ca-sub').textContent=`encaissé en ${moisLabel}`;
-  document.getElementById('ready-alerts').innerHTML=ready.map(s=>`
-    <div class="ready-alert">🏆 <strong>${s.fname} ${s.lname}</strong> a toutes ses compétences ok — <span style="color:var(--success)">prêt pour l'examen !</span>
-    <button class="btn btn-ghost btn-sm" style="margin-left:auto;" onclick="openStudentDetail(${s.id})">Voir fiche</button></div>`).join('');
+  // === ALERTES DASHBOARD ===
+  // On combine 4 types d'alertes dans un bloc unique pour que le moniteur voie
+  // tout ce qui mérite son attention sur une seule zone.
+  document.getElementById('ready-alerts').innerHTML=buildDashboardAlerts(ready);
   // Cours du jour
   const tEvs=events.filter(e=>e.date===today()).sort((a,b)=>a.time.localeCompare(b.time));
   document.getElementById('today-count').textContent=tEvs.length+' cours';
@@ -1257,10 +1417,11 @@ function openStudentDetail(id, opts){
       <div class="detail-avatar" style="background:${c}20;color:${c}">${s.fname[0]+s.lname[0]}</div>
       <div class="detail-info">
         <h2>${s.fname} ${s.lname} ${permisBadge(s.permis)} ${ready?'<span class="ready-badge">🏆 Prêt pour l\'examen</span>':''}</h2>
-        <p>${s.phone} &nbsp;·&nbsp; <span class="tag ${examTag(s.exam)}">${s.exam}</span> &nbsp;·&nbsp; <span class="moniteur-badge">👤 ${moniteurName(s.moniteurId)}</span></p>
+        <p>${s.phone}${s.email?` &nbsp;·&nbsp; <span style="color:var(--muted)">📧 ${escapeHtml(s.email)}</span>`:''} &nbsp;·&nbsp; <span class="tag ${examTag(s.exam)}">${s.exam}</span> &nbsp;·&nbsp; <span class="moniteur-badge">👤 ${moniteurName(s.moniteurId)}</span></p>
         ${s.comment?`<p style="margin-top:5px;font-style:italic;font-size:.8rem;color:var(--muted)">${s.comment}</p>`:''}
       </div>
-      <div style="margin-left:auto;display:flex;gap:7px;flex-wrap:wrap;">
+      <div class="no-print" style="margin-left:auto;display:flex;gap:7px;flex-wrap:wrap;">
+        <button class="btn btn-ghost btn-sm" onclick="openContactModal(${id})">📨 Contacter</button>
         <button class="btn btn-ghost btn-sm" onclick="openSuiviModal(${id})">+ Fiche séance</button>
         <button class="btn btn-ghost btn-sm" onclick="printStudent(${id})">🖨️ Imprimer</button>
         <button class="btn btn-primary btn-sm" onclick="openEditModal(${id})">✏️ Modifier</button>
@@ -1427,6 +1588,137 @@ function deletePaiement(id,studentId){
   openStudentDetail(studentId);
 }
 
+// ===== CONTACT ÉLÈVE (Email / SMS) =====
+// On garde l'état du modal dans une variable globale simple : élève ciblé + canal courant.
+// mailto: et sms: sont des URI gérées nativement par le navigateur/OS — on ouvre juste
+// l'app de mail ou messagerie du téléphone avec un message pré-rempli.
+let contactState={studentId:null,canal:'sms'};
+
+// Génère le texte d'un modèle pré-rempli à partir d'un élève et d'un canal.
+// Retourne {subject, message} — subject est ignoré pour SMS.
+function buildContactTemplate(tpl,s,canal){
+  const prenom=s.fname;
+  // Prochain cours planifié de cet élève (le plus proche dans le futur)
+  const prochain=events
+    .filter(e=>e.studentId===s.id&&e.date>=today())
+    .sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time))[0];
+  const solde=soldeEleve(s);
+  const soldeFmt=fmtEuro(Math.max(0,solde));
+
+  let subject='',message='';
+  switch(tpl){
+    case 'rappel-cours':
+      subject=`Rappel de ton cours de moto`;
+      if(prochain){
+        message=`Bonjour ${prenom},\n\nJe te rappelle ton cours de ${prochain.type} prévu le ${prochain.date} à ${prochain.time} (${prochain.dur}h).\n\nÀ très vite !`;
+      }else{
+        message=`Bonjour ${prenom},\n\nJe te contacte pour convenir de la date de ton prochain cours. Quelles sont tes disponibilités ?\n\nÀ bientôt.`;
+      }
+      break;
+    case 'relance-paiement':
+      subject=`Concernant le règlement de ta formation`;
+      if(solde>0.005){
+        message=`Bonjour ${prenom},\n\nIl reste ${soldeFmt} à régler sur ta formation (${s.hours}h effectuées × ${fmtEuro(s.tarifHoraire||50)}).\n\nPeux-tu me confirmer la date du prochain versement ? Merci d'avance.`;
+      }else{
+        message=`Bonjour ${prenom},\n\nTon règlement est à jour, merci ! Je voulais juste m'en assurer.\n\nÀ bientôt.`;
+      }
+      break;
+    case 'invitation-examen':
+      subject=`Tu es prêt(e) pour l'examen !`;
+      message=`Bonjour ${prenom},\n\nToutes tes compétences sont validées, je pense que tu es prêt(e) à passer l'examen de ${s.permis||'A2'}.\n\nDonne-moi tes disponibilités pour que je puisse le planifier.\n\nFélicitations !`;
+      break;
+    case 'libre':
+    default:
+      subject='';
+      message=`Bonjour ${prenom},\n\n`;
+      break;
+  }
+  return {subject,message};
+}
+
+// Ouvre le modal pour un élève donné, canal par défaut à SMS (téléphone toujours présent).
+function openContactModal(studentId){
+  const s=students.find(x=>x.id===studentId);
+  if(!s){showToast('Élève introuvable','error');return;}
+  contactState.studentId=studentId;
+  // Pré-sélection : SMS par défaut. Si pas de tél mais email → bascule sur email.
+  const canalDefaut=(!s.phone||s.phone==='—')&&s.email?'email':'sms';
+  document.getElementById('contact-student-id').value=studentId;
+  document.getElementById('contact-student-label').textContent=`Destinataire : ${s.fname} ${s.lname}`;
+  document.getElementById('contact-template').value='rappel-cours';
+  setContactCanal(canalDefaut);
+  openModal('contact');
+}
+
+// Bascule entre Email et SMS : met à jour l'UI (onglet actif, destinataire visible,
+// affichage/masquage du sujet) puis re-remplit automatiquement le message.
+function setContactCanal(canal){
+  contactState.canal=canal;
+  const s=students.find(x=>x.id===contactState.studentId);
+  if(!s)return;
+  // Style des onglets (actif = primary, inactif = ghost)
+  document.getElementById('contact-tab-sms').className='btn '+(canal==='sms'?'btn-primary':'btn-ghost');
+  document.getElementById('contact-tab-email').className='btn '+(canal==='email'?'btn-primary':'btn-ghost');
+  // Le sujet ne sert qu'en email (les SMS n'ont pas d'objet)
+  document.getElementById('contact-subject-group').style.display=canal==='email'?'':'none';
+  // Destinataire affiché + avertissement si manquant
+  const recipEl=document.getElementById('contact-recipient');
+  if(canal==='email'){
+    if(s.email){
+      recipEl.innerHTML=`📧 À : <strong>${escapeHtml(s.email)}</strong>`;
+      recipEl.style.color='var(--muted)';
+    }else{
+      recipEl.innerHTML=`⚠️ Aucun email renseigné pour cet élève. Ajoute-le via "Modifier" pour envoyer un email.`;
+      recipEl.style.color='var(--warning)';
+    }
+  }else{
+    if(s.phone&&s.phone!=='—'){
+      recipEl.innerHTML=`📲 À : <strong>${escapeHtml(s.phone)}</strong>`;
+      recipEl.style.color='var(--muted)';
+    }else{
+      recipEl.innerHTML=`⚠️ Aucun téléphone renseigné.`;
+      recipEl.style.color='var(--warning)';
+    }
+  }
+  document.getElementById('contact-send-label').textContent=canal==='email'?'Email':'SMS';
+  applyContactTemplate();
+}
+
+// Remplit les champs sujet + message à partir du modèle sélectionné.
+// Appelée quand on change de canal ou de modèle.
+function applyContactTemplate(){
+  const s=students.find(x=>x.id===contactState.studentId);
+  if(!s)return;
+  const tpl=document.getElementById('contact-template').value;
+  const {subject,message}=buildContactTemplate(tpl,s,contactState.canal);
+  document.getElementById('contact-subject').value=subject;
+  document.getElementById('contact-message').value=message;
+}
+
+// Ouvre l'URI mailto: ou sms: avec le message pré-encodé.
+// L'OS se charge d'ouvrir l'app correspondante (Mail, Messages, Gmail, WhatsApp, etc).
+function sendContact(){
+  const s=students.find(x=>x.id===contactState.studentId);
+  if(!s)return;
+  const canal=contactState.canal;
+  const message=document.getElementById('contact-message').value||'';
+  if(canal==='email'){
+    if(!s.email){showToast('Aucun email renseigné pour cet élève','error');return;}
+    const subject=document.getElementById('contact-subject').value||'';
+    // mailto:email?subject=...&body=...
+    const url=`mailto:${encodeURIComponent(s.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`;
+    window.location.href=url;
+  }else{
+    if(!s.phone||s.phone==='—'){showToast('Aucun téléphone renseigné','error');return;}
+    // sms:phone?body=... (iOS utilise ?body=, Android accepte aussi). On nettoie les espaces du téléphone.
+    const tel=s.phone.replace(/\s+/g,'');
+    const url=`sms:${encodeURIComponent(tel)}?body=${encodeURIComponent(message)}`;
+    window.location.href=url;
+  }
+  closeModal('contact');
+  showToast(canal==='email'?'Email ouvert dans votre app mail 📧':'SMS ouvert dans votre app messages 📲');
+}
+
 // ===== EDIT MODAL =====
 function openEditModal(id){
   const s=students.find(x=>x.id===id);if(!s)return;
@@ -1435,6 +1727,7 @@ function openEditModal(id){
   document.getElementById('edit-fname').value=s.fname;
   document.getElementById('edit-lname').value=s.lname;
   document.getElementById('edit-phone').value=s.phone;
+  document.getElementById('edit-email').value=s.email||'';
   document.getElementById('edit-hours').value=s.hours;
   document.getElementById('edit-exam').value=s.exam;
   // Permis : si l'élève n'en a pas encore (données anciennes), on affiche A2 par défaut
@@ -1459,6 +1752,7 @@ function saveEditStudent(){
   const s=students.find(x=>x.id===id);if(!s)return;
   s.fname=fname;s.lname=lname;
   s.phone=document.getElementById('edit-phone').value||s.phone;
+  s.email=(document.getElementById('edit-email').value||'').trim();
   s.hours=parseInt(document.getElementById('edit-hours').value)||s.hours;
   s.exam=document.getElementById('edit-exam').value;
   const permisRaw=document.getElementById('edit-permis').value;
@@ -1971,9 +2265,10 @@ function addStudent(){
   // Tarif horaire : on accepte les nombres positifs (entier ou décimal). Défaut 50€ si vide/invalide.
   const tarifRaw=parseFloat(document.getElementById('new-tarif').value);
   const tarifHoraire=(isFinite(tarifRaw)&&tarifRaw>=0)?tarifRaw:50;
-  students.push({id:nouvelId('students'),fname,lname,phone:document.getElementById('new-phone').value||'—',hours:parseInt(document.getElementById('new-hours').value)||0,exam:document.getElementById('new-exam').value,permis,tarifHoraire,comment:'',moniteurId,skills:{Freinage:'Débutant',Virage:'Débutant',Maniabilité:'Débutant',Équilibre:'Débutant',Signalisation:'Débutant',Vitesse:'Débutant'},history:[]});
+  const email=(document.getElementById('new-email').value||'').trim();
+  students.push({id:nouvelId('students'),fname,lname,phone:document.getElementById('new-phone').value||'—',email,hours:parseInt(document.getElementById('new-hours').value)||0,exam:document.getElementById('new-exam').value,permis,tarifHoraire,comment:'',moniteurId,skills:{Freinage:'Débutant',Virage:'Débutant',Maniabilité:'Débutant',Équilibre:'Débutant',Signalisation:'Débutant',Vitesse:'Débutant'},history:[]});
   saveData();closeModal('add-student');
-  ['new-fname','new-lname','new-phone'].forEach(id=>document.getElementById(id).value='');
+  ['new-fname','new-lname','new-phone','new-email'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('new-hours').value=0;
   document.getElementById('new-permis').value='A2';
   document.getElementById('new-tarif').value=50;
