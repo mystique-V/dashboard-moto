@@ -55,6 +55,12 @@ Dashboard conçu pour simplifier la gestion quotidienne d'une moto-école : suiv
 - Radar des compétences moyennes
 - Courbe d'évolution individuelle par élève
 
+### 📄 Fiche élève imprimable
+- Bouton `🖨️ Imprimer` sur chaque fiche élève
+- Mise en page **A4 optimisée** pour le papier (fond blanc, badges colorés conservés)
+- Toutes les fiches de séance incluses (compétences, signatures, historique)
+- Compatible **"Enregistrer en PDF"** depuis le dialogue d'impression du navigateur
+
 ### 🎨 UX
 - Thème clair / sombre
 - Responsive (bureau, tablette, mobile)
@@ -154,13 +160,9 @@ const CACHE_VERSION = 'moto-ecole-v12'; // ← bumper ici
 ## 🗺️ Roadmap
 
 - [ ] Forfaits prédéfinis (création rapide d'élève depuis un template)
-- [ ] Fiche élève imprimable (PDF)
 - [ ] Rappels locaux (examens à venir, paiements en retard)
-- [ ] Multi-utilisateur (nécessiterait un backend)
 - [ ] Authentification + rôles (admin / moniteur / secrétaire)
-- [ ] Sync multi-appareil via Supabase
-- [ ] Forfaits prédéfinis
-- [ ] Fiche élève imprimable (PDF)
+- [ ] Sync multi-appareil via Supabase (nécessiterait un backend cloud)
 
 ---
 
