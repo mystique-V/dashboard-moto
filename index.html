@@ -1202,12 +1202,25 @@ function loadData(){
     // Migration v8 : date d'examen (YYYY-MM-DD) — vide par défaut.
     // Permet de générer des alertes "examen dans X jours" et d'afficher un compte à rebours.
     students.forEach(s=>{if(typeof s.examDate!=='string')s.examDate='';});
-    // Nettoyage auto des alertes reportées expirées ou anciennes (> 60j)
-    // pour éviter l'accumulation infinie dans le localStorage
+    // Sécurité : champs obligatoires qui peuvent manquer sur des données très anciennes ou corrompues.
+    // Sans ces garde-fous, avgSkillVal / openStudentDetail peuvent crasher.
+    const skillsParDefaut=()=>{const o={};SKILLS.forEach(sk=>o[sk]='Débutant');return o;};
+    students.forEach(s=>{
+      if(!s.skills||typeof s.skills!=='object')s.skills=skillsParDefaut();
+      // Complète les skills manquants sans écraser les existants
+      SKILLS.forEach(sk=>{if(!LEVELS.includes(s.skills[sk]))s.skills[sk]='Débutant';});
+      if(!Array.isArray(s.history))s.history=[];
+      if(typeof s.comment!=='string')s.comment='';
+      if(typeof s.phone!=='string')s.phone='';
+      if(typeof s.fname!=='string')s.fname='';
+      if(typeof s.lname!=='string')s.lname='';
+      if(typeof s.moniteurId!=='number')s.moniteurId=(moniteurs[0]||{id:1}).id;
+    });
+    // Nettoyage auto des alertes reportées expirées.
+    // On garde uniquement celles qui ne sont pas encore expirées pour éviter l'accumulation.
     if(alertesReportees.length){
       const today_=today();
-      const il_y_a_60j=(()=>{const d=new Date();d.setDate(d.getDate()-60);return toLocalISO(d);})();
-      alertesReportees=alertesReportees.filter(r=>r.jusqua>=today_||r.jusqua>=il_y_a_60j);
+      alertesReportees=alertesReportees.filter(r=>r.jusqua>=today_);
     }
   }catch(e){console.warn('Load failed',e);}
 }
@@ -1255,7 +1268,7 @@ window.addEventListener('beforeunload',e=>{
 
 // ===== EXPORT / IMPORT =====
 function exportData(){
-  const data={version:8,exported:new Date().toISOString(),students,events,suivis,moniteurs,paiements,forfaits,reglages,alertesReportees,nextIds};
+  const data={version:8,exported:new Date().toISOString(),students,events,suivis,moniteurs,paiements,forfaits,reglages,alertesReportees,nextIds,currentMoniteurId};
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
@@ -1296,6 +1309,24 @@ function importData(event){
       students.forEach(s=>{if(typeof s.forfaitNom!=='string')s.forfaitNom='';});
       // Migration date d'examen : v7 et antérieur → pas de date
       students.forEach(s=>{if(typeof s.examDate!=='string')s.examDate='';});
+      // Sécurité : champs structurels garantis (évite crashes sur imports anciens ou corrompus)
+      const skillsParDefaut=()=>{const o={};SKILLS.forEach(sk=>o[sk]='Débutant');return o;};
+      students.forEach(s=>{
+        if(!s.skills||typeof s.skills!=='object')s.skills=skillsParDefaut();
+        SKILLS.forEach(sk=>{if(!LEVELS.includes(s.skills[sk]))s.skills[sk]='Débutant';});
+        if(!Array.isArray(s.history))s.history=[];
+        if(typeof s.comment!=='string')s.comment='';
+        if(typeof s.phone!=='string')s.phone='';
+        if(typeof s.fname!=='string')s.fname='';
+        if(typeof s.lname!=='string')s.lname='';
+        if(typeof s.moniteurId!=='number')s.moniteurId=(moniteurs[0]||{id:1}).id;
+      });
+      // Import du moniteur actif si présent (v8+)
+      if(typeof d.currentMoniteurId==='number'&&moniteurs.some(m=>m.id===d.currentMoniteurId)){
+        currentMoniteurId=d.currentMoniteurId;
+      }else if(!moniteurs.some(m=>m.id===currentMoniteurId)){
+        currentMoniteurId=(moniteurs[0]||{id:1}).id;
+      }
       saveData();renderDashboard();
       showToast(`Import réussi : ${students.length} élèves ✅`);
     }catch(err){showToast('Fichier invalide ou corrompu','error');}
@@ -1319,7 +1350,7 @@ function openExportModal(){
 function currentMoniteur(){return moniteurs.find(m=>m.id===currentMoniteurId)||moniteurs[0]||{id:0,name:'Inconnu'};}
 function updateMoniteurLabel(){const m=currentMoniteur();document.getElementById('current-moniteur-name').textContent=m.name;}
 function populateMoniteurSelects(){
-  const opts=moniteurs.map(m=>`<option value="${m.id}">${m.name}</option>`).join('');
+  const opts=moniteurs.map(m=>`<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('');
   ['ev-moniteur','suivi-moniteur-select','new-moniteur-assign','edit-moniteur-assign'].forEach(id=>{
     const el=document.getElementById(id);if(el){el.innerHTML=opts;el.value=currentMoniteurId;}
   });
@@ -1379,7 +1410,7 @@ function renderMoniteursList(){
   document.getElementById('moniteurs-list').innerHTML=moniteurs.map(m=>`
     <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">
       <span style="flex:1;font-size:.85rem;font-weight:${m.id===currentMoniteurId?'700':'400'};color:${m.id===currentMoniteurId?'var(--accent)':'var(--text)'};">
-        ${m.id===currentMoniteurId?'👤 ':''} ${m.name} ${m.id===currentMoniteurId?'<span class="moniteur-badge">Actif</span>':''}
+        ${m.id===currentMoniteurId?'👤 ':''} ${escapeHtml(m.name)} ${m.id===currentMoniteurId?'<span class="moniteur-badge">Actif</span>':''}
       </span>
       ${m.id!==currentMoniteurId?`<button class="btn btn-ghost btn-sm" onclick="switchMoniteur(${m.id})">Choisir</button>`:''}
       <button class="btn btn-danger btn-sm" onclick="deleteMoniteur(${m.id})">🗑</button>
@@ -1430,7 +1461,13 @@ function avgSkillLabel(s){return LEVELS[avgSkillVal(s)-1]||LEVELS[0];}
 function skillBadge(level){return`<span class="skill-badge ${LEVEL_CLASS[level]||'debutant'}">${level}</span>`;}
 function examTag(e){return{'Réussi':'tag-green','En formation':'tag-blue','Examen planifié':'tag-orange','Échoué':'tag-red'}[e]||'tag-blue';}
 function isReadyForExam(s){return Object.values(s.skills).every(v=>v==='Acquis'||v==='Maîtrisé');}
-function moniteurName(id){const m=moniteurs.find(x=>x.id===id);return m?m.name:'—';}
+// Renvoie le nom du moniteur DÉJÀ échappé HTML (sûr pour innerHTML).
+// Si tu as besoin du nom brut (pour textContent ou alert), utilise moniteurs.find() directement.
+function moniteurName(id){const m=moniteurs.find(x=>x.id===id);return m?escapeHtml(m.name):'—';}
+// Renvoie "Prénom Nom" échappé HTML pour un élève (sûr pour innerHTML).
+function nomEleveHtml(s){return s?escapeHtml(s.fname)+' '+escapeHtml(s.lname):'?';}
+// Renvoie les initiales échappées (ex: "KM") pour un avatar.
+function initialesHtml(s){return escapeHtml((s.fname||'?')[0]+(s.lname||'?')[0]);}
 
 // ===== VALIDATION =====
 function validateField(inputId,errId,condition){
@@ -1600,7 +1637,7 @@ function buildDashboardAlerts(ready){
       // Liste compacte des élèves concernés
       const noms=coursDemain.map(e=>{
         const s=students.find(x=>x.id===e.studentId);
-        return s?`${s.fname} ${s.lname[0]}.`:'?';
+        return s?`${escapeHtml(s.fname)} ${escapeHtml((s.lname||'')[0]||'')}.`:'?';
       }).slice(0,4).join(', ');
       const extra=coursDemain.length>4?` (+${coursDemain.length-4})`:'';
       alerts.push({
@@ -1669,8 +1706,8 @@ function renderDashboard(){
     const s=students.find(x=>x.id===e.studentId);
     return`<div class="event-item clickable" onclick="openSuiviFromEvent(${e.id})" title="Remplir la fiche de séance">
       <div class="event-dot" style="background:var(--accent2)"></div>
-      <div style="flex:1"><div class="event-time">${e.time} — ${e.dur}h · <span class="moniteur-badge">${moniteurName(e.moniteurId)}</span></div>
-      <div class="event-title">${s?s.fname+' '+s.lname:'?'} · ${e.type}</div></div>
+      <div style="flex:1"><div class="event-time">${escapeHtml(e.time)} — ${e.dur}h · <span class="moniteur-badge">${moniteurName(e.moniteurId)}</span></div>
+      <div class="event-title">${nomEleveHtml(s)} · ${escapeHtml(e.type)}</div></div>
       <span style="font-size:.71rem;color:var(--accent);font-weight:600;">+ Fiche</span>
     </div>`;
   }).join(''):'<p style="color:var(--muted);font-size:.82rem;">Aucun cours aujourd\'hui.</p>';
@@ -1684,7 +1721,7 @@ function renderDashboard(){
   // Recent students
   document.getElementById('recent-students-table').innerHTML=students.slice(0,5).map(s=>{
     const c=COLORS[s.id%COLORS.length];
-    return`<tr><td><div class="student-name"><div class="avatar" style="background:${c}20;color:${c}">${s.fname[0]+s.lname[0]}</div>${s.fname} ${s.lname} ${permisBadge(s.permis)}${isReadyForExam(s)&&s.exam!=='Réussi'?'<span class="ready-badge" style="margin-left:5px;">Prêt</span>':''}</div></td><td>${s.hours}h</td><td>${skillBadge(avgSkillLabel(s))}</td><td><span class="tag ${examTag(s.exam)}">${s.exam}</span></td></tr>`;
+    return`<tr><td><div class="student-name"><div class="avatar" style="background:${c}20;color:${c}">${initialesHtml(s)}</div>${nomEleveHtml(s)} ${permisBadge(s.permis)}${isReadyForExam(s)&&s.exam!=='Réussi'?'<span class="ready-badge" style="margin-left:5px;">Prêt</span>':''}</div></td><td>${s.hours}h</td><td>${skillBadge(avgSkillLabel(s))}</td><td><span class="tag ${examTag(s.exam)}">${s.exam}</span></td></tr>`;
   }).join('');
   updateStorageInfo();
 }
@@ -1738,8 +1775,8 @@ function renderStudentsTable(){
   document.getElementById('students-table').innerHTML=list.map(s=>{
     const c=COLORS[s.id%COLORS.length];const ready=isReadyForExam(s)&&s.exam!=='Réussi';
     return`<tr>
-      <td><div class="student-name"><div class="avatar" style="background:${c}20;color:${c}">${s.fname[0]+s.lname[0]}</div>${s.fname} ${s.lname} ${permisBadge(s.permis)}${ready?'<span class="ready-badge" style="margin-left:5px;">Prêt</span>':''}</div></td>
-      <td style="color:var(--muted)">${s.phone}</td><td>${s.hours}h</td>
+      <td><div class="student-name"><div class="avatar" style="background:${c}20;color:${c}">${initialesHtml(s)}</div>${nomEleveHtml(s)} ${permisBadge(s.permis)}${ready?'<span class="ready-badge" style="margin-left:5px;">Prêt</span>':''}</div></td>
+      <td style="color:var(--muted)">${escapeHtml(s.phone||'')}</td><td>${s.hours}h</td>
       <td>${skillBadge(avgSkillLabel(s))}</td>
       <td><span class="tag ${examTag(s.exam)}">${s.exam}</span></td>
       <td><span class="moniteur-badge">${moniteurName(s.moniteurId)}</span></td>
@@ -1795,10 +1832,10 @@ function openStudentDetail(id, opts){
   const soldeLabel=solde>0.005?'Reste à payer':(solde<-0.005?'Crédit (trop versé)':'À jour');
   document.getElementById('student-detail-content').innerHTML=`
     <div class="detail-header">
-      <div class="detail-avatar" style="background:${c}20;color:${c}">${s.fname[0]+s.lname[0]}</div>
+      <div class="detail-avatar" style="background:${c}20;color:${c}">${initialesHtml(s)}</div>
       <div class="detail-info">
-        <h2>${s.fname} ${s.lname} ${permisBadge(s.permis)} ${ready?'<span class="ready-badge">🏆 Prêt pour l\'examen</span>':''}</h2>
-        <p>${s.phone}${s.email?` &nbsp;·&nbsp; <span style="color:var(--muted)">📧 ${escapeHtml(s.email)}</span>`:''} &nbsp;·&nbsp; <span class="tag ${examTag(s.exam)}">${s.exam}</span> &nbsp;·&nbsp; <span class="moniteur-badge">👤 ${moniteurName(s.moniteurId)}</span>${s.forfaitNom?` &nbsp;·&nbsp; <span class="moniteur-badge" style="background:rgba(249,115,22,.15);color:var(--accent);">📦 ${escapeHtml(s.forfaitNom)}</span>`:''}</p>
+        <h2>${nomEleveHtml(s)} ${permisBadge(s.permis)} ${ready?'<span class="ready-badge">🏆 Prêt pour l\'examen</span>':''}</h2>
+        <p>${escapeHtml(s.phone||'')}${s.email?` &nbsp;·&nbsp; <span style="color:var(--muted)">📧 ${escapeHtml(s.email)}</span>`:''} &nbsp;·&nbsp; <span class="tag ${examTag(s.exam)}">${s.exam}</span> &nbsp;·&nbsp; <span class="moniteur-badge">👤 ${moniteurName(s.moniteurId)}</span>${s.forfaitNom?` &nbsp;·&nbsp; <span class="moniteur-badge" style="background:rgba(249,115,22,.15);color:var(--accent);">📦 ${escapeHtml(s.forfaitNom)}</span>`:''}</p>
         ${s.examDate?(()=>{
           const c=formatExamCountdown(s.examDate);
           // Couleur d'ambiance : rouge si dans 7j ou moins, orange si 30j ou moins, sinon neutre
@@ -1806,7 +1843,7 @@ function openStudentDetail(id, opts){
           const bg=c.jours<0?'rgba(148,163,184,.15)':(c.jours<=7?'rgba(239,68,68,.15)':(c.jours<=30?'rgba(249,115,22,.15)':'rgba(99,102,241,.15)'));
           return `<p style="margin-top:6px;font-size:.82rem;"><span class="moniteur-badge" style="background:${bg};color:${col};">📝 Examen le ${c.dateFR} · <strong>${c.rel}</strong></span></p>`;
         })():''}
-        ${s.comment?`<p style="margin-top:5px;font-style:italic;font-size:.8rem;color:var(--muted)">${s.comment}</p>`:''}
+        ${s.comment?`<p style="margin-top:5px;font-style:italic;font-size:.8rem;color:var(--muted)">${escapeHtml(s.comment)}</p>`:''}
       </div>
       <div class="no-print" style="margin-left:auto;display:flex;gap:7px;flex-wrap:wrap;">
         <button class="btn btn-ghost btn-sm" onclick="openContactModal(${id})">📨 Contacter</button>
@@ -1826,19 +1863,19 @@ function openStudentDetail(id, opts){
       </div>
       <div class="card">
         <div class="card-title"><span>Historique des cours</span><span style="font-size:.72rem;color:var(--muted)">${hist.length} séance${hist.length>1?'s':''}</span></div>
-        ${hist.length?hist.map(h=>`<div class="hist-item"><div class="event-dot" style="background:var(--accent2);flex-shrink:0;margin-top:0;"></div><div class="hist-type">${h.type}</div><div class="hist-date">${h.date}</div><div class="hist-dur">${h.dur}h</div></div>`).join(''):'<p style="color:var(--muted);font-size:.81rem;">Aucun historique.</p>'}
+        ${hist.length?hist.map(h=>`<div class="hist-item"><div class="event-dot" style="background:var(--accent2);flex-shrink:0;margin-top:0;"></div><div class="hist-type">${escapeHtml(h.type)}</div><div class="hist-date">${escapeHtml(h.date)}</div><div class="hist-dur">${h.dur}h</div></div>`).join(''):'<p style="color:var(--muted);font-size:.81rem;">Aucun historique.</p>'}
       </div>
     </div>
     <div class="card" style="margin-top:14px;">
       <div class="card-title"><span>Dernières fiches de séance</span><span style="font-size:.72rem;color:var(--muted)">${sNotes.length} fiche${sNotes.length>1?'s':''}</span></div>
       ${fichesToShow.length?fichesToShow.map(n=>`<div class="note-card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:5px;">
-          <div class="note-date">${n.date} · ${n.type} (${n.dur}h) · <span class="moniteur-badge">${moniteurName(n.moniteurId)}</span></div>
-          <div style="display:flex;gap:5px;align-items:center;"><span style="font-size:.74rem">${n.comportement}</span><button class="btn btn-danger btn-sm" onclick="deleteSuivi(${n.id},${id})">🗑</button></div>
+          <div class="note-date">${escapeHtml(n.date)} · ${escapeHtml(n.type)} (${n.dur}h) · <span class="moniteur-badge">${moniteurName(n.moniteurId)}</span></div>
+          <div style="display:flex;gap:5px;align-items:center;"><span style="font-size:.74rem">${escapeHtml(n.comportement||'')}</span><button class="btn btn-danger btn-sm" onclick="deleteSuivi(${n.id},${id})">🗑</button></div>
         </div>
-        ${n.positif?`<div style="font-size:.78rem;color:var(--success);margin-bottom:3px;">✅ ${n.positif}</div>`:''}
-        ${n.ameliorer?`<div style="font-size:.78rem;color:var(--warning);">⚠️ ${n.ameliorer}</div>`:''}
-        ${n.objectif?`<div style="font-size:.78rem;color:var(--accent2);margin-top:4px;">🎯 ${n.objectif}</div>`:''}
+        ${n.positif?`<div style="font-size:.78rem;color:var(--success);margin-bottom:3px;">✅ ${escapeHtml(n.positif)}</div>`:''}
+        ${n.ameliorer?`<div style="font-size:.78rem;color:var(--warning);">⚠️ ${escapeHtml(n.ameliorer)}</div>`:''}
+        ${n.objectif?`<div style="font-size:.78rem;color:var(--accent2);margin-top:4px;">🎯 ${escapeHtml(n.objectif)}</div>`:''}
         ${(n.signatureMoniteur||n.signatureEleve)?`
           <div class="signatures-row">
             ${n.signatureMoniteur?`<div class="sig-mini"><span>👤 Moniteur</span><img src="${n.signatureMoniteur}" alt="Signature moniteur"/></div>`:''}
@@ -1871,8 +1908,8 @@ function openStudentDetail(id, opts){
       </div>
       ${sPaiements.length?`<div>${sPaiements.map(p=>`
         <div class="paiement-row">
-          <span class="pr-date">${p.date}</span>
-          <span class="pr-methode">${p.methode||'—'}</span>
+          <span class="pr-date">${escapeHtml(p.date||'')}</span>
+          <span class="pr-methode">${escapeHtml(p.methode||'—')}</span>
           <span class="pr-note">${p.note?escapeHtml(p.note):''}</span>
           <span class="pr-montant">+ ${fmtEuro(p.montant)}</span>
           <button class="btn btn-danger btn-sm no-print" onclick="deletePaiement(${p.id},${id})">🗑</button>
@@ -2293,8 +2330,8 @@ function renderEventsList(){
     return`<div class="event-item" style="justify-content:space-between;">
       <div style="display:flex;gap:10px;align-items:flex-start;flex:1;">
         <div class="event-dot" style="background:${col};margin-top:5px;"></div>
-        <div><div class="event-time">${e.date} à ${e.time} (${e.dur}h) · <span class="moniteur-badge">${moniteurName(e.moniteurId)}</span></div>
-        <div class="event-title">${s?s.fname+' '+s.lname:'?'} · ${e.type}</div></div>
+        <div><div class="event-time">${escapeHtml(e.date)} à ${escapeHtml(e.time)} (${e.dur}h) · <span class="moniteur-badge">${moniteurName(e.moniteurId)}</span></div>
+        <div class="event-title">${nomEleveHtml(s)} · ${escapeHtml(e.type)}</div></div>
       </div>
       <div style="display:flex;gap:4px;flex-shrink:0;">
         <button class="btn btn-ghost btn-sm" onclick="editEvent(${e.id})">✏️</button>
@@ -2327,9 +2364,9 @@ function renderWeek(){
       ${dayEvs.map(e=>{
         const s=students.find(x=>x.id===e.studentId);
         return`<div class="week-event" onclick="editEvent(${e.id})">
-          <div class="we-time">${e.time} · ${e.dur}h</div>
-          <div class="we-name">${s?s.fname+' '+s.lname[0]+'.':'?'}</div>
-          <div style="font-size:.65rem;color:var(--muted);margin-top:1px;">${e.type}</div>
+          <div class="we-time">${escapeHtml(e.time)} · ${e.dur}h</div>
+          <div class="we-name">${s?escapeHtml(s.fname)+' '+escapeHtml((s.lname||'')[0]||'')+'.':'?'}</div>
+          <div style="font-size:.65rem;color:var(--muted);margin-top:1px;">${escapeHtml(e.type)}</div>
         </div>`;
       }).join('')}
       ${!dayEvs.length?`<div style="font-size:.7rem;color:var(--border);text-align:center;padding:8px;">—</div>`:''}
@@ -2494,7 +2531,7 @@ document.querySelectorAll('.modal-overlay').forEach(m=>m.addEventListener('click
 function openAddEventModal(prefill={}){
   populateMoniteurSelects();
   const sel=document.getElementById('ev-student');
-  sel.innerHTML='<option value="">— Sélectionner un élève —</option>'+students.map(s=>`<option value="${s.id}">${s.fname} ${s.lname}</option>`).join('');
+  sel.innerHTML='<option value="">— Sélectionner un élève —</option>'+students.map(s=>`<option value="${s.id}">${escapeHtml(s.fname)} ${escapeHtml(s.lname)}</option>`).join('');
   document.getElementById('ev-id').value='';
   document.getElementById('ev-date').value=prefill.date||today();
   document.getElementById('ev-time').value=prefill.time||'09:00';
@@ -2511,7 +2548,7 @@ function editEvent(id){
   const e=events.find(x=>x.id===id);if(!e)return;
   populateMoniteurSelects();
   const sel=document.getElementById('ev-student');
-  sel.innerHTML=students.map(s=>`<option value="${s.id}">${s.fname} ${s.lname}</option>`).join('');
+  sel.innerHTML=students.map(s=>`<option value="${s.id}">${escapeHtml(s.fname)} ${escapeHtml(s.lname)}</option>`).join('');
   sel.value=e.studentId;
   document.getElementById('ev-id').value=id;
   document.getElementById('ev-date').value=e.date;
@@ -2573,7 +2610,7 @@ function openSuiviFromEvent(eventId){
 function _openSuiviModal(){
   setSuiviStep(1);populateMoniteurSelects();
   const sel=document.getElementById('suivi-student');
-  sel.innerHTML='<option value="">— Sélectionner un élève —</option>'+students.map(s=>`<option value="${s.id}">${s.fname} ${s.lname}</option>`).join('');
+  sel.innerHTML='<option value="">— Sélectionner un élève —</option>'+students.map(s=>`<option value="${s.id}">${escapeHtml(s.fname)} ${escapeHtml(s.lname)}</option>`).join('');
   if(suiviPrefill.studentId)sel.value=suiviPrefill.studentId;
   document.getElementById('suivi-date').value=suiviPrefill.date||today();
   document.getElementById('suivi-dur').value=suiviPrefill.dur||1;
@@ -2749,7 +2786,7 @@ function renderSuivis(){
   document.getElementById('filter-suivi-moniteur').value=filterM;
   const fs=document.getElementById('filter-suivi-student');
   const cur=fs.value;
-  fs.innerHTML='<option value="">Tous les élèves</option>'+students.map(s=>`<option value="${s.id}"${cur==s.id?' selected':''}>${s.fname} ${s.lname}</option>`).join('');
+  fs.innerHTML='<option value="">Tous les élèves</option>'+students.map(s=>`<option value="${s.id}"${cur==s.id?' selected':''}>${escapeHtml(s.fname)} ${escapeHtml(s.lname)}</option>`).join('');
   const filterSid=fs.value;
   const filterType=document.getElementById('filter-suivi-type').value;
   let list=[...suivis].sort((a,b)=>b.date.localeCompare(a.date));
@@ -2764,22 +2801,22 @@ function renderSuivis(){
     return`<div class="card" style="margin-bottom:14px;">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
         <div style="display:flex;align-items:center;gap:10px;">
-          <div class="avatar" style="background:${c}20;color:${c};width:36px;height:36px;font-size:.84rem;">${s?s.fname[0]+s.lname[0]:'?'}</div>
-          <div><div style="font-weight:600;font-size:.88rem;">${s?s.fname+' '+s.lname:'Inconnu'}</div>
-          <div style="font-size:.74rem;color:var(--muted);">${f.date} · ${f.type} · ${f.dur}h · <span class="moniteur-badge">${moniteurName(f.moniteurId)}</span></div></div>
+          <div class="avatar" style="background:${c}20;color:${c};width:36px;height:36px;font-size:.84rem;">${s?initialesHtml(s):'?'}</div>
+          <div><div style="font-weight:600;font-size:.88rem;">${s?nomEleveHtml(s):'Inconnu'}</div>
+          <div style="font-size:.74rem;color:var(--muted);">${escapeHtml(f.date)} · ${escapeHtml(f.type)} · ${f.dur}h · <span class="moniteur-badge">${moniteurName(f.moniteurId)}</span></div></div>
         </div>
         <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap;">
-          <span style="font-size:.84rem;">${f.comportement}</span>
-          <span style="font-size:.79rem;padding:3px 8px;border-radius:99px;background:${f.securite.includes('✅')?'rgba(16,185,129,.15)':f.securite.includes('⚠️')?'rgba(245,158,11,.15)':'rgba(244,63,94,.15)'};color:${f.securite.includes('✅')?'var(--success)':f.securite.includes('⚠️')?'var(--warning)':'var(--danger)'};">${f.securite}</span>
+          <span style="font-size:.84rem;">${escapeHtml(f.comportement||'')}</span>
+          <span style="font-size:.79rem;padding:3px 8px;border-radius:99px;background:${f.securite.includes('✅')?'rgba(16,185,129,.15)':f.securite.includes('⚠️')?'rgba(245,158,11,.15)':'rgba(244,63,94,.15)'};color:${f.securite.includes('✅')?'var(--success)':f.securite.includes('⚠️')?'var(--warning)':'var(--danger)'};">${escapeHtml(f.securite||'')}</span>
           <button class="btn btn-danger btn-sm" onclick="deleteSuivi(${f.id},null)">🗑</button>
         </div>
       </div>
-      ${skEntries.length?`<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;">`+skEntries.map(([sk,lv])=>`<span style="font-size:.73rem;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:3px 8px;color:var(--muted);">${sk} → ${skillBadge(lv)}</span>`).join('')+`</div>`:''}
+      ${skEntries.length?`<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;">`+skEntries.map(([sk,lv])=>`<span style="font-size:.73rem;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:3px 8px;color:var(--muted);">${escapeHtml(sk)} → ${skillBadge(lv)}</span>`).join('')+`</div>`:''}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:.8rem;">
-        ${f.positif?`<div style="background:rgba(16,185,129,.07);border-radius:8px;padding:9px 11px;border-left:3px solid var(--success);"><div style="font-size:.69rem;color:var(--success);font-weight:600;margin-bottom:3px;">✅ POINTS POSITIFS</div>${f.positif}</div>`:''}
-        ${f.ameliorer?`<div style="background:rgba(245,158,11,.07);border-radius:8px;padding:9px 11px;border-left:3px solid var(--warning);"><div style="font-size:.69rem;color:var(--warning);font-weight:600;margin-bottom:3px;">⚠️ À TRAVAILLER</div>${f.ameliorer}</div>`:''}
+        ${f.positif?`<div style="background:rgba(16,185,129,.07);border-radius:8px;padding:9px 11px;border-left:3px solid var(--success);"><div style="font-size:.69rem;color:var(--success);font-weight:600;margin-bottom:3px;">✅ POINTS POSITIFS</div>${escapeHtml(f.positif)}</div>`:''}
+        ${f.ameliorer?`<div style="background:rgba(245,158,11,.07);border-radius:8px;padding:9px 11px;border-left:3px solid var(--warning);"><div style="font-size:.69rem;color:var(--warning);font-weight:600;margin-bottom:3px;">⚠️ À TRAVAILLER</div>${escapeHtml(f.ameliorer)}</div>`:''}
       </div>
-      ${f.objectif?`<div style="margin-top:10px;background:rgba(99,102,241,.07);border-radius:8px;padding:9px 11px;border-left:3px solid var(--accent2);font-size:.8rem;"><span style="font-size:.69rem;color:var(--accent2);font-weight:600;">🎯 OBJECTIF &nbsp;</span>${f.objectif}</div>`:''}
+      ${f.objectif?`<div style="margin-top:10px;background:rgba(99,102,241,.07);border-radius:8px;padding:9px 11px;border-left:3px solid var(--accent2);font-size:.8rem;"><span style="font-size:.69rem;color:var(--accent2);font-weight:600;">🎯 OBJECTIF &nbsp;</span>${escapeHtml(f.objectif)}</div>`:''}
     </div>`;
   }).join('');
 }
@@ -2792,7 +2829,7 @@ function renderStats(){
   document.getElementById('stat-suivis').textContent=suivis.length;
   document.getElementById('stat-events').textContent=events.length;
   const sel=document.getElementById('stats-student-select');
-  sel.innerHTML=students.map(s=>`<option value="${s.id}">${s.fname} ${s.lname}</option>`).join('');
+  sel.innerHTML=students.map(s=>`<option value="${s.id}">${escapeHtml(s.fname)} ${escapeHtml(s.lname)}</option>`).join('');
   const tc=darkMode?'#94a3b8':'#64748b';const gc=darkMode?'#2e3248':'#e2e8f0';const lc=darkMode?'#f1f5f9':'#1e293b';
   // === GRAPHES DÉPLACÉS DU DASHBOARD VERS STATS ===
   // On les calcule ici pour que la page Stats soit autonome (= fonctionne même
