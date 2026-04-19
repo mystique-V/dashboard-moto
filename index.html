@@ -243,6 +243,7 @@ tr:hover td{background:rgba(128,128,128,.04);}
 .alert-payment{background:rgba(249,115,22,.08);border-color:rgba(249,115,22,.3);}
 .alert-inactive{background:rgba(244,63,94,.08);border-color:rgba(244,63,94,.3);}
 .alert-info{background:rgba(99,102,241,.08);border-color:rgba(99,102,241,.3);}
+.alert-exam{background:rgba(239,68,68,.10);border-color:rgba(239,68,68,.4);}
 /* Titre de section "Alertes" plus compact quand il y en a */
 .alerts-section-title{font-size:.8rem;font-weight:700;color:var(--muted);margin:4px 0 8px;display:flex;align-items:center;gap:8px;}
 .alerts-section-title .alerts-count{background:var(--accent);color:#fff;padding:1px 8px;border-radius:99px;font-size:.68rem;}
@@ -723,9 +724,10 @@ tr:hover td{background:rgba(128,128,128,.04);}
       </select></div>
     </div>
     <div class="form-row">
+      <div class="form-group"><label>Date d'examen (si planifiée)</label><input id="new-exam-date" type="date" title="Laisser vide si pas encore de date"/></div>
       <div class="form-group"><label>Tarif horaire (€)</label><input id="new-tarif" type="number" value="50" min="0" step="1"/></div>
-      <div class="form-group"><label>Moniteur référent</label><select id="new-moniteur-assign" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 11px;color:var(--text);font-size:.84rem;outline:none;"></select></div>
     </div>
+    <div class="form-group"><label>Moniteur référent</label><select id="new-moniteur-assign" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 11px;color:var(--text);font-size:.84rem;outline:none;"></select></div>
     <div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal('add-student')">Annuler</button><button class="btn btn-primary" onclick="addStudent()">Ajouter</button></div>
   </div>
 </div>
@@ -850,9 +852,10 @@ tr:hover td{background:rgba(128,128,128,.04);}
       </select></div>
     </div>
     <div class="form-row">
+      <div class="form-group"><label>Date d'examen (si planifiée)</label><input id="edit-exam-date" type="date" title="Laisser vide si pas encore de date"/></div>
       <div class="form-group"><label>Tarif horaire (€)</label><input id="edit-tarif" type="number" min="0" step="1"/></div>
-      <div class="form-group"><label>Moniteur référent</label><select id="edit-moniteur-assign" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 11px;color:var(--text);font-size:.84rem;outline:none;"></select></div>
     </div>
+    <div class="form-group"><label>Moniteur référent</label><select id="edit-moniteur-assign" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 11px;color:var(--text);font-size:.84rem;outline:none;"></select></div>
     <div class="form-group"><label>Commentaire / objectifs</label><textarea id="edit-comment" placeholder="Remarques libres…"></textarea></div>
     <div class="section-label">Compétences</div>
     <div id="edit-skills-inputs"></div>
@@ -1116,6 +1119,12 @@ let forfaits=[
 // Réglages généraux de la moto-école (nom, adresse, etc.)
 // Stocké sous forme d'objet pour pouvoir étendre plus tard sans migration.
 let reglages={nomEcole:'',adresse:'',telephone:''};
+// ===== ALERTES REPORTÉES =====
+// Liste des alertes que l'utilisateur a masquées via le bouton "✓".
+// Chaque entrée : {cle: "payment-42", jusqua: "2026-05-01"} → l'alerte est cachée
+// jusqu'à cette date, puis elle réapparaît automatiquement (utile pour ne pas
+// oublier définitivement une alerte).
+let alertesReportees=[];
 // Compteurs d'ID séparés par type de donnée (évite les conflits lors d'imports)
 let nextIds={students:200,events:200,suivis:200,moniteurs:200,paiements:400,forfaits:600};
 function nouvelId(type){return nextIds[type]++;}
@@ -1129,7 +1138,7 @@ const STORAGE_LIMIT=5*1024*1024;       // limite navigateur typique (5 Mo)
 const STORAGE_SAFE_LIMIT=4.5*1024*1024; // marge de sécurité 10%
 
 function saveData(){
-  const json=JSON.stringify({students,events,suivis,moniteurs,paiements,forfaits,reglages,nextIds,currentMoniteurId});
+  const json=JSON.stringify({students,events,suivis,moniteurs,paiements,forfaits,reglages,alertesReportees,nextIds,currentMoniteurId});
   const size=new Blob([json]).size;
   try{
     // Refus préventif si trop gros (évite l'écriture partielle)
@@ -1171,6 +1180,8 @@ function loadData(){
       if(Array.isArray(p.forfaits))forfaits=p.forfaits;
       // Réglages : introduits en v7 — objet par défaut si absent
       if(p.reglages&&typeof p.reglages==='object')reglages=Object.assign(reglages,p.reglages);
+      // Alertes reportées : introduites en v8 — tableau vide par défaut
+      if(Array.isArray(p.alertesReportees))alertesReportees=p.alertesReportees;
       if(p.nextIds)nextIds=p.nextIds;
       else if(p.nextId)nextIds={students:p.nextId,events:p.nextId,suivis:p.nextId,moniteurs:p.nextId,paiements:p.nextId,forfaits:p.nextId};
       // Assure la présence des compteurs même sur données antérieures
@@ -1188,6 +1199,16 @@ function loadData(){
     // Migration v7 : nom du forfait choisi (texte figé, indépendant du tableau forfaits)
     // — permet d'afficher un badge sur la fiche sans dépendre d'un id qui pourrait disparaître.
     students.forEach(s=>{if(typeof s.forfaitNom!=='string')s.forfaitNom='';});
+    // Migration v8 : date d'examen (YYYY-MM-DD) — vide par défaut.
+    // Permet de générer des alertes "examen dans X jours" et d'afficher un compte à rebours.
+    students.forEach(s=>{if(typeof s.examDate!=='string')s.examDate='';});
+    // Nettoyage auto des alertes reportées expirées ou anciennes (> 60j)
+    // pour éviter l'accumulation infinie dans le localStorage
+    if(alertesReportees.length){
+      const today_=today();
+      const il_y_a_60j=(()=>{const d=new Date();d.setDate(d.getDate()-60);return toLocalISO(d);})();
+      alertesReportees=alertesReportees.filter(r=>r.jusqua>=today_||r.jusqua>=il_y_a_60j);
+    }
   }catch(e){console.warn('Load failed',e);}
 }
 function updateStorageInfo(){
@@ -1234,7 +1255,7 @@ window.addEventListener('beforeunload',e=>{
 
 // ===== EXPORT / IMPORT =====
 function exportData(){
-  const data={version:7,exported:new Date().toISOString(),students,events,suivis,moniteurs,paiements,forfaits,reglages,nextIds};
+  const data={version:8,exported:new Date().toISOString(),students,events,suivis,moniteurs,paiements,forfaits,reglages,alertesReportees,nextIds};
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
@@ -1259,6 +1280,8 @@ function importData(event){
       if(Array.isArray(d.forfaits))forfaits=d.forfaits;
       // Réglages : v7+ — fusion avec défauts
       if(d.reglages&&typeof d.reglages==='object')reglages=Object.assign({nomEcole:'',adresse:'',telephone:''},d.reglages);
+      // Alertes reportées : v8+ — tableau vide par défaut
+      alertesReportees=Array.isArray(d.alertesReportees)?d.alertesReportees:[];
       if(d.nextIds)nextIds=d.nextIds;
       else if(d.nextId)nextIds={students:d.nextId,events:d.nextId,suivis:d.nextId,moniteurs:d.nextId,paiements:d.nextId,forfaits:d.nextId};
       if(!nextIds.paiements)nextIds.paiements=400;
@@ -1271,6 +1294,8 @@ function importData(event){
       students.forEach(s=>{if(typeof s.email!=='string')s.email='';});
       // Migration forfait : v6 et antérieur → pas de forfait choisi
       students.forEach(s=>{if(typeof s.forfaitNom!=='string')s.forfaitNom='';});
+      // Migration date d'examen : v7 et antérieur → pas de date
+      students.forEach(s=>{if(typeof s.examDate!=='string')s.examDate='';});
       saveData();renderDashboard();
       showToast(`Import réussi : ${students.length} élèves ✅`);
     }catch(err){showToast('Fichier invalide ou corrompu','error');}
@@ -1420,9 +1445,11 @@ function clearErrors(...ids){ids.forEach(id=>{document.getElementById(id)?.class
 // PAIEMENT_RETARD_JOURS : on considère qu'un élève est en retard si aucun paiement depuis ce nombre de jours.
 // PAIEMENT_SEUIL_EUROS : en-dessous de ce solde, pas d'alerte (on ignore les "petits" retards).
 // INACTIF_JOURS : aucun cours dans l'historique depuis ce nombre de jours → élève inactif.
+// EXAM_IMMINENT_JOURS : une alerte d'examen imminent se déclenche quand l'examen est dans ≤ ce nombre de jours.
 const PAIEMENT_RETARD_JOURS=30;
 const PAIEMENT_SEUIL_EUROS=100;
 const INACTIF_JOURS=21;
+const EXAM_IMMINENT_JOURS=14;
 
 // Retourne le nombre de jours entre aujourd'hui et une date YYYY-MM-DD (positif = date passée).
 function joursDepuis(dateStr){
@@ -1433,22 +1460,91 @@ function joursDepuis(dateStr){
   return Math.floor((now-d)/(1000*60*60*24));
 }
 
-// Construit le HTML des alertes en combinant les 4 types.
+// Retourne le nombre de jours entre aujourd'hui et une date future (positif = date future).
+// C'est l'inverse de joursDepuis : pratique pour les comptes à rebours d'examen.
+function joursAvant(dateStr){
+  if(!dateStr)return Infinity;
+  return -joursDepuis(dateStr);
+}
+
+// Formate une date YYYY-MM-DD en libellé lisible avec compte à rebours relatif.
+// Ex : "21 avril 2026 · demain" / "dans 5 jours" / "il y a 3 jours".
+function formatExamCountdown(dateStr){
+  if(!dateStr)return '';
+  const d=parseLocalDate(dateStr);
+  const dateFR=d.toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'});
+  const j=joursAvant(dateStr);
+  let rel;
+  if(j===0)rel="aujourd'hui";
+  else if(j===1)rel='demain';
+  else if(j===-1)rel='hier';
+  else if(j>0)rel=`dans ${j} jours`;
+  else rel=`il y a ${-j} jours`;
+  return {dateFR,rel,jours:j};
+}
+
+// Vérifie si une alerte a été reportée (masquée temporairement) par l'utilisateur.
+// La clé identifie l'alerte (ex: "payment-42" pour le paiement de l'élève 42).
+function estReportee(cle){
+  const today_=today();
+  return alertesReportees.some(r=>r.cle===cle&&r.jusqua>today_);
+}
+
+// Reporte une alerte pour N jours (elle ne s'affichera plus jusqu'à cette date).
+// Si déjà reportée, on met à jour la date.
+function reporterAlerte(cle,jours){
+  const d=new Date();
+  d.setDate(d.getDate()+jours);
+  const jusqua=toLocalISO(d);
+  const existante=alertesReportees.find(r=>r.cle===cle);
+  if(existante){existante.jusqua=jusqua;}
+  else{alertesReportees.push({cle,jusqua});}
+  saveData();
+  renderDashboard();
+  showToast(`Alerte reportée de ${jours} jour${jours>1?'s':''} 💤`);
+}
+
+// Construit le HTML des alertes en combinant les types.
 // On passe `ready` en paramètre car il est déjà calculé par renderDashboard (évite le recalcul).
+// Chaque alerte a une priorité (plus le nombre est petit, plus c'est important) qui sert au tri.
 function buildDashboardAlerts(ready){
   const alerts=[];
 
-  // 1. ÉLÈVES PRÊTS POUR L'EXAMEN (vert) — existe déjà, on le conserve
-  ready.forEach(s=>{
+  // 1. EXAMEN IMMINENT (rouge, TOP priorité) — date d'examen dans ≤ 14 jours
+  students.forEach(s=>{
+    if(!s.examDate)return;
+    if(s.exam==='Réussi'||s.exam==='Échoué')return; // examen déjà passé
+    const j=joursAvant(s.examDate);
+    if(j<0||j>EXAM_IMMINENT_JOURS)return; // pas dans la fenêtre
+    const cle=`exam-${s.id}-${s.examDate}`;
+    if(estReportee(cle))return;
+    const quand=j===0?"aujourd'hui":(j===1?'demain':`dans ${j} jours`);
+    // Prêt ou pas ? On le mentionne pour aider à la décision
+    const pret=isReadyForExam(s);
+    const statut=pret?'<span style="color:var(--success)">✓ prêt</span>':'<span style="color:var(--warning)">⚠ compétences incomplètes</span>';
     alerts.push({
-      type:'ready',
-      icon:'🏆',
-      html:`<strong>${escapeHtml(s.fname)} ${escapeHtml(s.lname)}</strong> a toutes ses compétences ok — <span style="color:var(--success)">prêt pour l'examen !</span>`,
-      actions:`<button class="btn btn-ghost btn-sm" onclick="openStudentDetail(${s.id})">Voir fiche</button>`
+      priorite:j<=3?1:2, // J-3 ou moins = urgence max
+      type:'exam',
+      icon:'📝',
+      html:`<strong>${escapeHtml(s.fname)} ${escapeHtml(s.lname)}</strong> passe l'examen <strong style="color:var(--danger)">${quand}</strong> — ${statut}`,
+      actions:`<button class="btn btn-ghost btn-sm" onclick="openStudentDetail(${s.id})">Fiche</button><button class="btn btn-ghost btn-sm" onclick="reporterAlerte('${cle}',1)" title="Reporter d'1 jour">💤 1j</button>`
     });
   });
 
-  // 2. PAIEMENTS EN RETARD (orange) — solde > seuil ET (aucun paiement OU dernier > 30j)
+  // 2. ÉLÈVES PRÊTS POUR L'EXAMEN (vert)
+  ready.forEach(s=>{
+    const cle=`ready-${s.id}`;
+    if(estReportee(cle))return;
+    alerts.push({
+      priorite:3,
+      type:'ready',
+      icon:'🏆',
+      html:`<strong>${escapeHtml(s.fname)} ${escapeHtml(s.lname)}</strong> a toutes ses compétences ok — <span style="color:var(--success)">prêt pour l'examen !</span>`,
+      actions:`<button class="btn btn-ghost btn-sm" onclick="openStudentDetail(${s.id})">Voir fiche</button><button class="btn btn-ghost btn-sm" onclick="reporterAlerte('${cle}',7)" title="Reporter de 7 jours">💤 7j</button>`
+    });
+  });
+
+  // 3. PAIEMENTS EN RETARD (orange) — solde > seuil ET (aucun paiement OU dernier > 30j)
   students.forEach(s=>{
     if(s.exam==='Réussi')return; // on ne relance pas les élèves qui ont déjà eu leur permis
     const solde=soldeEleve(s);
@@ -1458,18 +1554,21 @@ function buildDashboardAlerts(ready){
     const dernierPaiement=sPay.length?sPay.map(p=>p.date).sort().pop():null;
     const joursSansPaiement=dernierPaiement?joursDepuis(dernierPaiement):Infinity;
     if(joursSansPaiement<PAIEMENT_RETARD_JOURS)return;
+    const cle=`payment-${s.id}`;
+    if(estReportee(cle))return;
     const libelle=dernierPaiement
       ?`dernier paiement il y a ${joursSansPaiement} j`
       :`aucun paiement enregistré`;
     alerts.push({
+      priorite:4,
       type:'payment',
       icon:'💶',
       html:`<strong>${escapeHtml(s.fname)} ${escapeHtml(s.lname)}</strong> doit <strong style="color:var(--accent)">${fmtEuro(solde)}</strong> — ${libelle}`,
-      actions:`<button class="btn btn-ghost btn-sm" onclick="openContactModal(${s.id})">📨 Relancer</button><button class="btn btn-ghost btn-sm" onclick="openStudentDetail(${s.id})">Fiche</button>`
+      actions:`<button class="btn btn-ghost btn-sm" onclick="openContactModal(${s.id})">📨 Relancer</button><button class="btn btn-ghost btn-sm" onclick="openStudentDetail(${s.id})">Fiche</button><button class="btn btn-ghost btn-sm" onclick="reporterAlerte('${cle}',7)" title="Reporter de 7 jours">💤 7j</button>`
     });
   });
 
-  // 3. ÉLÈVES INACTIFS (rouge) — aucun cours depuis X jours ET pas réussi
+  // 4. ÉLÈVES INACTIFS (rouge) — aucun cours depuis X jours ET pas réussi
   students.forEach(s=>{
     if(s.exam==='Réussi')return;
     // Date du dernier cours dans l'historique (évite les cours futurs encore planifiés)
@@ -1477,35 +1576,45 @@ function buildDashboardAlerts(ready){
     const dernierCours=hist.length?hist.map(h=>h.date).sort().pop():null;
     const jours=dernierCours?joursDepuis(dernierCours):Infinity;
     if(jours<INACTIF_JOURS)return;
+    const cle=`inactive-${s.id}`;
+    if(estReportee(cle))return;
     // On plafonne pour éviter des affichages du type "il y a 9999 jours" quand pas d'historique
     const libelle=dernierCours
       ?`aucun cours depuis ${jours} j`
       :`aucun cours enregistré`;
     alerts.push({
+      priorite:5,
       type:'inactive',
       icon:'💤',
       html:`<strong>${escapeHtml(s.fname)} ${escapeHtml(s.lname)}</strong> — ${libelle}`,
-      actions:`<button class="btn btn-ghost btn-sm" onclick="openContactModal(${s.id})">📨 Contacter</button><button class="btn btn-ghost btn-sm" onclick="openStudentDetail(${s.id})">Fiche</button>`
+      actions:`<button class="btn btn-ghost btn-sm" onclick="openContactModal(${s.id})">📨 Contacter</button><button class="btn btn-ghost btn-sm" onclick="openStudentDetail(${s.id})">Fiche</button><button class="btn btn-ghost btn-sm" onclick="reporterAlerte('${cle}',7)" title="Reporter de 7 jours">💤 7j</button>`
     });
   });
 
-  // 4. COURS DE DEMAIN (bleu, info) — rappel pour préparer les fiches de séance
+  // 5. COURS DE DEMAIN (bleu, info) — rappel pour préparer les fiches de séance
   const demain=nextDate(1);
   const coursDemain=events.filter(e=>e.date===demain);
   if(coursDemain.length){
-    // Liste compacte des élèves concernés
-    const noms=coursDemain.map(e=>{
-      const s=students.find(x=>x.id===e.studentId);
-      return s?`${s.fname} ${s.lname[0]}.`:'?';
-    }).slice(0,4).join(', ');
-    const extra=coursDemain.length>4?` (+${coursDemain.length-4})`:'';
-    alerts.push({
-      type:'info',
-      icon:'📅',
-      html:`<strong>${coursDemain.length} cours demain</strong> — ${escapeHtml(noms)}${extra}`,
-      actions:`<button class="btn btn-ghost btn-sm" onclick="showPage('calendar',document.querySelectorAll('.nav-item')[2])">Voir agenda</button>`
-    });
+    const cle=`tomorrow-${demain}`;
+    if(!estReportee(cle)){
+      // Liste compacte des élèves concernés
+      const noms=coursDemain.map(e=>{
+        const s=students.find(x=>x.id===e.studentId);
+        return s?`${s.fname} ${s.lname[0]}.`:'?';
+      }).slice(0,4).join(', ');
+      const extra=coursDemain.length>4?` (+${coursDemain.length-4})`:'';
+      alerts.push({
+        priorite:6,
+        type:'info',
+        icon:'📅',
+        html:`<strong>${coursDemain.length} cours demain</strong> — ${escapeHtml(noms)}${extra}`,
+        actions:`<button class="btn btn-ghost btn-sm" onclick="showPage('calendar',document.querySelectorAll('.nav-item')[2])">Voir agenda</button><button class="btn btn-ghost btn-sm" onclick="reporterAlerte('${cle}',1)" title="Masquer jusqu'à demain">💤</button>`
+      });
+    }
   }
+
+  // Tri par priorité (1 = plus urgent, 6 = moins urgent)
+  alerts.sort((a,b)=>a.priorite-b.priorite);
 
   // Si aucune alerte, on n'affiche rien (plutôt qu'un message "tout va bien" qui prend de la place).
   if(alerts.length===0)return '';
@@ -1690,6 +1799,13 @@ function openStudentDetail(id, opts){
       <div class="detail-info">
         <h2>${s.fname} ${s.lname} ${permisBadge(s.permis)} ${ready?'<span class="ready-badge">🏆 Prêt pour l\'examen</span>':''}</h2>
         <p>${s.phone}${s.email?` &nbsp;·&nbsp; <span style="color:var(--muted)">📧 ${escapeHtml(s.email)}</span>`:''} &nbsp;·&nbsp; <span class="tag ${examTag(s.exam)}">${s.exam}</span> &nbsp;·&nbsp; <span class="moniteur-badge">👤 ${moniteurName(s.moniteurId)}</span>${s.forfaitNom?` &nbsp;·&nbsp; <span class="moniteur-badge" style="background:rgba(249,115,22,.15);color:var(--accent);">📦 ${escapeHtml(s.forfaitNom)}</span>`:''}</p>
+        ${s.examDate?(()=>{
+          const c=formatExamCountdown(s.examDate);
+          // Couleur d'ambiance : rouge si dans 7j ou moins, orange si 30j ou moins, sinon neutre
+          const col=c.jours<0?'var(--muted)':(c.jours<=7?'var(--danger)':(c.jours<=30?'var(--accent)':'var(--accent2)'));
+          const bg=c.jours<0?'rgba(148,163,184,.15)':(c.jours<=7?'rgba(239,68,68,.15)':(c.jours<=30?'rgba(249,115,22,.15)':'rgba(99,102,241,.15)'));
+          return `<p style="margin-top:6px;font-size:.82rem;"><span class="moniteur-badge" style="background:${bg};color:${col};">📝 Examen le ${c.dateFR} · <strong>${c.rel}</strong></span></p>`;
+        })():''}
         ${s.comment?`<p style="margin-top:5px;font-style:italic;font-size:.8rem;color:var(--muted)">${s.comment}</p>`:''}
       </div>
       <div class="no-print" style="margin-left:auto;display:flex;gap:7px;flex-wrap:wrap;">
@@ -2065,6 +2181,8 @@ function openEditModal(id){
   document.getElementById('edit-permis').value=PERMIS_VALUES.includes(s.permis)?s.permis:'A2';
   // Tarif horaire : fallback 50€ si jamais défini
   document.getElementById('edit-tarif').value=(typeof s.tarifHoraire==='number'&&s.tarifHoraire>=0)?s.tarifHoraire:50;
+  // Date d'examen : chaîne vide si non renseignée
+  document.getElementById('edit-exam-date').value=s.examDate||'';
   document.getElementById('edit-comment').value=s.comment||'';
   document.getElementById('edit-moniteur-assign').value=s.moniteurId||currentMoniteurId;
   document.getElementById('edit-skills-inputs').innerHTML=SKILLS.map(sk=>`
@@ -2091,6 +2209,8 @@ function saveEditStudent(){
   // Tarif horaire : on garde l'ancien si champ vide ou invalide
   const tarifRaw=parseFloat(document.getElementById('edit-tarif').value);
   s.tarifHoraire=(isFinite(tarifRaw)&&tarifRaw>=0)?tarifRaw:(s.tarifHoraire||50);
+  // Date d'examen : on accepte la chaîne vide (retire la date) ou une date valide YYYY-MM-DD
+  s.examDate=(document.getElementById('edit-exam-date').value||'').trim();
   s.comment=document.getElementById('edit-comment').value;
   s.moniteurId=parseInt(document.getElementById('edit-moniteur-assign').value)||s.moniteurId;
   SKILLS.forEach(sk=>{const v=document.getElementById('ep-'+sk).value;if(LEVELS.includes(v))s.skills[sk]=v;});
@@ -2819,9 +2939,11 @@ function addStudent(){
   const forfaitId=parseInt(document.getElementById('new-forfait').value,10);
   const forfaitChoisi=forfaitId?forfaits.find(x=>x.id===forfaitId):null;
   const forfaitNom=forfaitChoisi?forfaitChoisi.nom:'';
-  students.push({id:nouvelId('students'),fname,lname,phone:document.getElementById('new-phone').value||'—',email,hours:parseInt(document.getElementById('new-hours').value)||0,exam:document.getElementById('new-exam').value,permis,tarifHoraire,forfaitNom,comment:'',moniteurId,skills:{Freinage:'Débutant',Virage:'Débutant',Maniabilité:'Débutant',Équilibre:'Débutant',Signalisation:'Débutant',Vitesse:'Débutant'},history:[]});
+  // Date d'examen : champ optionnel (YYYY-MM-DD) — chaîne vide si non renseigné
+  const examDate=(document.getElementById('new-exam-date').value||'').trim();
+  students.push({id:nouvelId('students'),fname,lname,phone:document.getElementById('new-phone').value||'—',email,hours:parseInt(document.getElementById('new-hours').value)||0,exam:document.getElementById('new-exam').value,examDate,permis,tarifHoraire,forfaitNom,comment:'',moniteurId,skills:{Freinage:'Débutant',Virage:'Débutant',Maniabilité:'Débutant',Équilibre:'Débutant',Signalisation:'Débutant',Vitesse:'Débutant'},history:[]});
   saveData();closeModal('add-student');
-  ['new-fname','new-lname','new-phone','new-email'].forEach(id=>document.getElementById(id).value='');
+  ['new-fname','new-lname','new-phone','new-email','new-exam-date'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('new-hours').value=0;
   document.getElementById('new-permis').value='A2';
   document.getElementById('new-tarif').value=50;
