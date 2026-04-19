@@ -42,6 +42,10 @@ body{font-family:'Segoe UI',sans-serif;background:var(--bg);color:var(--text);mi
 .btn-danger{background:rgba(244,63,94,.15);color:var(--danger);}
 .btn-success{background:rgba(16,185,129,.15);color:var(--success);}
 .btn-sm{padding:4px 9px;font-size:.71rem;}
+/* Bouton Réglages : pleine largeur, icône + texte, bien visible dans le footer sidebar */
+.btn-settings{background:var(--surface);color:var(--text);border:1px solid var(--border);padding:9px 12px;border-radius:8px;font-size:.8rem;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;width:100%;text-align:left;transition:background .15s,border-color .15s;}
+.btn-settings:hover{background:var(--card);border-color:var(--accent);}
+.btn-settings span:first-child{font-size:1rem;}
 .theme-toggle{background:var(--border);border:none;border-radius:8px;padding:7px 10px;cursor:pointer;font-size:1rem;color:var(--text);}
 .content{padding:20px;flex:1;}
 .page{display:none;}.page.active{display:block;}
@@ -467,6 +471,11 @@ tr:hover td{background:rgba(128,128,128,.04);}
     </nav>
     <div class="sidebar-footer" style="display:flex;flex-direction:column;gap:8px;">
       <div id="moniteur-label" style="font-weight:600;color:var(--accent);font-size:.78rem;">👤 <span id="current-moniteur-name">—</span></div>
+      <!-- Bouton Réglages pleine largeur, bien visible : c'est la porte d'entrée
+           vers la gestion des forfaits et des infos de l'école. -->
+      <button class="btn btn-settings" onclick="openReglages()" title="Forfaits, infos de l'école…">
+        <span>⚙️</span><span>Réglages</span>
+      </button>
       <div style="display:flex;gap:5px;flex-wrap:wrap;">
         <button class="btn btn-ghost btn-sm" onclick="openModal('export-data')" title="Exporter les données">📤 Export</button>
         <button class="btn btn-ghost btn-sm" onclick="document.getElementById('import-file').click()" title="Importer des données">📥 Import</button>
@@ -488,7 +497,7 @@ tr:hover td{background:rgba(128,128,128,.04);}
           <div class="search-results" id="search-results" role="listbox"></div>
         </div>
         <button class="theme-toggle" onclick="toggleTheme()" id="theme-btn" title="Thème">🌙</button>
-        <button class="btn btn-primary" onclick="openModal('add-student')" title="Nouvel élève">+ <span class="btn-label-long">Nouvel Élève</span></button>
+        <button class="btn btn-primary" onclick="openAddStudentModal()" title="Nouvel élève">+ <span class="btn-label-long">Nouvel Élève</span></button>
       </div>
     </div>
 
@@ -683,6 +692,18 @@ tr:hover td{background:rgba(128,128,128,.04);}
 <!-- ===== MODAL AJOUT ÉLÈVE ===== -->
 <div class="modal-overlay" id="modal-add-student">
   <div class="modal"><h2>➕ Nouvel élève</h2>
+    <!-- Sélecteur de forfait (optionnel) : pré-remplit permis + tarif si choisi.
+         Les valeurs sont ensuite copiées sur l'élève (approche B) → modifier ou
+         supprimer un forfait plus tard n'impacte pas les élèves déjà inscrits. -->
+    <div class="form-group" style="background:var(--surface);border-radius:8px;padding:10px 12px;border:1px dashed var(--border);">
+      <label style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+        <span>📦 Forfait (optionnel)</span>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('add-student');openReglages();" style="font-size:.68rem;">⚙️ Gérer</button>
+      </label>
+      <select id="new-forfait" onchange="applyForfaitToNewStudent()" style="width:100%;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:8px 11px;color:var(--text);font-size:.84rem;outline:none;">
+        <option value="">— Personnalisé (saisie manuelle) —</option>
+      </select>
+    </div>
     <div class="form-row">
       <div class="form-group"><label class="required">Prénom</label><input id="new-fname" placeholder="Prénom"/><div class="field-error" id="err-fname">Champ requis</div></div>
       <div class="form-group"><label class="required">Nom</label><input id="new-lname" placeholder="Nom"/><div class="field-error" id="err-lname">Champ requis</div></div>
@@ -921,6 +942,90 @@ tr:hover td{background:rgba(128,128,128,.04);}
   </div>
 </div>
 
+<!-- ===== MODAL RÉGLAGES ===== -->
+<!-- Contient les outils de configuration de l'école : forfaits prédéfinis,
+     infos générales (nom, adresse). Accessible depuis le footer sidebar.
+     Deux sections empilées plutôt que des onglets → plus simple, tout visible. -->
+<div class="modal-overlay" id="modal-reglages">
+  <div class="modal" style="max-width:720px;">
+    <h2>⚙️ Réglages</h2>
+
+    <!-- === Section Forfaits === -->
+    <div class="card" style="padding:14px;margin-bottom:14px;">
+      <div class="card-title" style="margin-bottom:10px;">
+        <span>📦 Forfaits prédéfinis</span>
+        <span style="font-size:.72rem;color:var(--muted);">Utilisés pour pré-remplir la création d'élèves</span>
+      </div>
+      <p style="font-size:.78rem;color:var(--muted);margin-bottom:10px;">
+        Définissez vos formules-type (heures, tarif, options). Lors de la création d'un élève,
+        choisir un forfait pré-remplira automatiquement les champs. Les élèves déjà inscrits
+        ne sont pas impactés par une modification de forfait.
+      </p>
+      <div id="forfaits-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;"></div>
+      <button class="btn btn-primary btn-sm" onclick="openForfaitForm()">+ Nouveau forfait</button>
+    </div>
+
+    <!-- === Section Moto-école === -->
+    <div class="card" style="padding:14px;margin-bottom:14px;">
+      <div class="card-title" style="margin-bottom:10px;">
+        <span>🏫 Informations de l'école</span>
+        <span style="font-size:.72rem;color:var(--muted);">Affichées sur les impressions</span>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Nom de l'école</label><input id="reglages-nom" placeholder="Moto-École du Port"/></div>
+        <div class="form-group"><label>Téléphone</label><input id="reglages-tel" placeholder="0692 11 22 33"/></div>
+      </div>
+      <div class="form-group"><label>Adresse</label><input id="reglages-adresse" placeholder="12 rue des Cocotiers, 97420 Le Port"/></div>
+      <button class="btn btn-primary btn-sm" onclick="saveReglagesEcole()">💾 Enregistrer les infos</button>
+    </div>
+
+    <div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal('reglages')">Fermer</button></div>
+  </div>
+</div>
+
+<!-- ===== MODAL FORFAIT (création / édition) ===== -->
+<div class="modal-overlay" id="modal-forfait">
+  <div class="modal">
+    <h2 id="forfait-modal-title">📦 Nouveau forfait</h2>
+    <input type="hidden" id="forfait-id"/>
+    <div class="form-group"><label>Nom du forfait *</label><input id="forfait-nom" placeholder="ex. Permis A2 — Standard"/></div>
+    <div class="form-row">
+      <div class="form-group"><label>Permis</label>
+        <select id="forfait-permis">
+          <option value="AM">AM (cyclo)</option>
+          <option value="A1">A1 (125cm³)</option>
+          <option value="A2" selected>A2</option>
+          <option value="A">A</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Couleur</label>
+        <select id="forfait-couleur">
+          <option value="#f97316">🟠 Orange</option>
+          <option value="#6366f1">🟣 Violet</option>
+          <option value="#10b981">🟢 Vert</option>
+          <option value="#f59e0b">🟡 Jaune</option>
+          <option value="#f43f5e">🔴 Rouge</option>
+          <option value="#06b6d4">🔵 Cyan</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Heures incluses *</label><input type="number" id="forfait-heures" min="1" step="1" placeholder="20"/></div>
+      <div class="form-group"><label>Tarif horaire (€)</label><input type="number" id="forfait-tarif" min="0" step="0.01" placeholder="60"/></div>
+      <div class="form-group"><label>Prix total (€)</label><input type="number" id="forfait-prix" min="0" step="0.01" placeholder="1200"/></div>
+    </div>
+    <div class="form-group"><label>Options (texte libre)</label><input id="forfait-options" placeholder="Code inclus · Théorie incluse"/></div>
+    <div class="form-group" style="display:flex;align-items:center;gap:8px;">
+      <input type="checkbox" id="forfait-actif" checked style="width:auto;"/>
+      <label for="forfait-actif" style="margin:0;cursor:pointer;">Forfait actif (disponible à la sélection)</label>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('forfait')">Annuler</button>
+      <button class="btn btn-primary" onclick="saveForfait()">💾 Enregistrer</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ===== CONSTANTES =====
 const COLORS=['#f97316','#6366f1','#10b981','#f43f5e','#f59e0b','#06b6d4','#a78bfa','#34d399'];
@@ -997,8 +1102,22 @@ let paiements=[
   {id:304,studentId:4,date:nextDate(-30),montant:1100,methode:'Virement',note:'Règlement complet'},
   {id:305,studentId:7,date:nextDate(-12),montant:600,methode:'Chèque',note:''},
 ];
+// ===== FORFAITS =====
+// Formules-type définies par la moto-école. Chaque forfait sert à pré-remplir
+// la création d'un nouvel élève (approche "copie des valeurs" : une fois l'élève
+// créé, les valeurs sont copiées sur sa fiche et le forfait peut être modifié
+// ou supprimé sans impacter les élèves existants).
+// Seeds par défaut : modifiables/supprimables via ⚙️ Réglages.
+let forfaits=[
+  {id:501,nom:'Permis A2 — Standard',permis:'A2',heures:20,tarifHoraire:60,prixTotal:1200,options:'Code inclus · Théorie incluse',couleur:'#f97316',actif:true},
+  {id:502,nom:'Permis A — Passerelle 7h',permis:'A',heures:7,tarifHoraire:60,prixTotal:420,options:'Obligatoire après 2 ans de A2',couleur:'#6366f1',actif:true},
+  {id:503,nom:'Permis A1 — Jeune',permis:'A1',heures:15,tarifHoraire:55,prixTotal:825,options:'Dès 16 ans · 125cm³',couleur:'#10b981',actif:true},
+];
+// Réglages généraux de la moto-école (nom, adresse, etc.)
+// Stocké sous forme d'objet pour pouvoir étendre plus tard sans migration.
+let reglages={nomEcole:'',adresse:'',telephone:''};
 // Compteurs d'ID séparés par type de donnée (évite les conflits lors d'imports)
-let nextIds={students:200,events:200,suivis:200,moniteurs:200,paiements:400};
+let nextIds={students:200,events:200,suivis:200,moniteurs:200,paiements:400,forfaits:600};
 function nouvelId(type){return nextIds[type]++;}
 let currentMoniteurId=1; // Moniteur connecté par défaut
 
@@ -1010,7 +1129,7 @@ const STORAGE_LIMIT=5*1024*1024;       // limite navigateur typique (5 Mo)
 const STORAGE_SAFE_LIMIT=4.5*1024*1024; // marge de sécurité 10%
 
 function saveData(){
-  const json=JSON.stringify({students,events,suivis,moniteurs,paiements,nextIds,currentMoniteurId});
+  const json=JSON.stringify({students,events,suivis,moniteurs,paiements,forfaits,reglages,nextIds,currentMoniteurId});
   const size=new Blob([json]).size;
   try{
     // Refus préventif si trop gros (évite l'écriture partielle)
@@ -1047,10 +1166,16 @@ function loadData(){
       suivis=p.suivis||suivis;moniteurs=p.moniteurs||moniteurs;
       // Paiements : introduits en v5 — fichier antérieur → tableau vide
       paiements=p.paiements||[];
+      // Forfaits : introduits en v7 — si absent du fichier, on garde les seeds
+      // par défaut (déjà en mémoire). Si présent dans le fichier (même vide), on prend.
+      if(Array.isArray(p.forfaits))forfaits=p.forfaits;
+      // Réglages : introduits en v7 — objet par défaut si absent
+      if(p.reglages&&typeof p.reglages==='object')reglages=Object.assign(reglages,p.reglages);
       if(p.nextIds)nextIds=p.nextIds;
-      else if(p.nextId)nextIds={students:p.nextId,events:p.nextId,suivis:p.nextId,moniteurs:p.nextId,paiements:p.nextId};
-      // Assure la présence du compteur paiements même sur données v4
+      else if(p.nextId)nextIds={students:p.nextId,events:p.nextId,suivis:p.nextId,moniteurs:p.nextId,paiements:p.nextId,forfaits:p.nextId};
+      // Assure la présence des compteurs même sur données antérieures
       if(!nextIds.paiements)nextIds.paiements=400;
+      if(!nextIds.forfaits)nextIds.forfaits=600;
       currentMoniteurId=p.currentMoniteurId||currentMoniteurId;
     }
     // Migration : les élèves enregistrés avant l'ajout du champ "permis"
@@ -1060,12 +1185,15 @@ function loadData(){
     students.forEach(s=>{if(typeof s.tarifHoraire!=='number'||s.tarifHoraire<0)s.tarifHoraire=50;});
     // Migration v6 : champ email optionnel → chaîne vide par défaut
     students.forEach(s=>{if(typeof s.email!=='string')s.email='';});
+    // Migration v7 : nom du forfait choisi (texte figé, indépendant du tableau forfaits)
+    // — permet d'afficher un badge sur la fiche sans dépendre d'un id qui pourrait disparaître.
+    students.forEach(s=>{if(typeof s.forfaitNom!=='string')s.forfaitNom='';});
   }catch(e){console.warn('Load failed',e);}
 }
 function updateStorageInfo(){
   try{
     // On calcule sur les données in-memory (reflète ce qui devrait être persisté)
-    const payload=JSON.stringify({students,events,suivis,moniteurs,paiements,nextIds,currentMoniteurId});
+    const payload=JSON.stringify({students,events,suivis,moniteurs,paiements,forfaits,reglages,nextIds,currentMoniteurId});
     const used=new Blob([payload]).size;
     const pct=Math.min(999,Math.round(used/STORAGE_LIMIT*100));
     const info=document.getElementById('storage-info');
@@ -1106,7 +1234,7 @@ window.addEventListener('beforeunload',e=>{
 
 // ===== EXPORT / IMPORT =====
 function exportData(){
-  const data={version:6,exported:new Date().toISOString(),students,events,suivis,moniteurs,paiements,nextIds};
+  const data={version:7,exported:new Date().toISOString(),students,events,suivis,moniteurs,paiements,forfaits,reglages,nextIds};
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
@@ -1122,20 +1250,27 @@ function importData(event){
     try{
       const d=JSON.parse(e.target.result);
       if(!d.students)throw new Error('Format invalide');
-      if(!confirm(`Importer ${d.students.length} élèves, ${d.events?.length||0} cours, ${d.suivis?.length||0} fiches, ${d.paiements?.length||0} paiements ?\nVos données actuelles seront remplacées.`))return;
+      if(!confirm(`Importer ${d.students.length} élèves, ${d.events?.length||0} cours, ${d.suivis?.length||0} fiches, ${d.paiements?.length||0} paiements, ${d.forfaits?.length||0} forfaits ?\nVos données actuelles seront remplacées.`))return;
       students=d.students;events=d.events||[];suivis=d.suivis||[];
       moniteurs=d.moniteurs||moniteurs;
       // Paiements : fichier antérieur à v5 → tableau vide (pas de paiement historisé)
       paiements=d.paiements||[];
+      // Forfaits : v7+ — si absent, on garde les seeds actuels. Si tableau présent (même vide), on prend.
+      if(Array.isArray(d.forfaits))forfaits=d.forfaits;
+      // Réglages : v7+ — fusion avec défauts
+      if(d.reglages&&typeof d.reglages==='object')reglages=Object.assign({nomEcole:'',adresse:'',telephone:''},d.reglages);
       if(d.nextIds)nextIds=d.nextIds;
-      else if(d.nextId)nextIds={students:d.nextId,events:d.nextId,suivis:d.nextId,moniteurs:d.nextId,paiements:d.nextId};
+      else if(d.nextId)nextIds={students:d.nextId,events:d.nextId,suivis:d.nextId,moniteurs:d.nextId,paiements:d.nextId,forfaits:d.nextId};
       if(!nextIds.paiements)nextIds.paiements=400;
+      if(!nextIds.forfaits)nextIds.forfaits=600;
       // Migration permis : fichier exporté avant la v4 → pas de champ permis → défaut A2
       students.forEach(s=>{if(!['AM','A1','A2','A'].includes(s.permis))s.permis='A2';});
       // Migration tarif : v4 et antérieur → 50€ par défaut
       students.forEach(s=>{if(typeof s.tarifHoraire!=='number'||s.tarifHoraire<0)s.tarifHoraire=50;});
       // Migration email : v5 et antérieur → chaîne vide
       students.forEach(s=>{if(typeof s.email!=='string')s.email='';});
+      // Migration forfait : v6 et antérieur → pas de forfait choisi
+      students.forEach(s=>{if(typeof s.forfaitNom!=='string')s.forfaitNom='';});
       saveData();renderDashboard();
       showToast(`Import réussi : ${students.length} élèves ✅`);
     }catch(err){showToast('Fichier invalide ou corrompu','error');}
@@ -1554,7 +1689,7 @@ function openStudentDetail(id, opts){
       <div class="detail-avatar" style="background:${c}20;color:${c}">${s.fname[0]+s.lname[0]}</div>
       <div class="detail-info">
         <h2>${s.fname} ${s.lname} ${permisBadge(s.permis)} ${ready?'<span class="ready-badge">🏆 Prêt pour l\'examen</span>':''}</h2>
-        <p>${s.phone}${s.email?` &nbsp;·&nbsp; <span style="color:var(--muted)">📧 ${escapeHtml(s.email)}</span>`:''} &nbsp;·&nbsp; <span class="tag ${examTag(s.exam)}">${s.exam}</span> &nbsp;·&nbsp; <span class="moniteur-badge">👤 ${moniteurName(s.moniteurId)}</span></p>
+        <p>${s.phone}${s.email?` &nbsp;·&nbsp; <span style="color:var(--muted)">📧 ${escapeHtml(s.email)}</span>`:''} &nbsp;·&nbsp; <span class="tag ${examTag(s.exam)}">${s.exam}</span> &nbsp;·&nbsp; <span class="moniteur-badge">👤 ${moniteurName(s.moniteurId)}</span>${s.forfaitNom?` &nbsp;·&nbsp; <span class="moniteur-badge" style="background:rgba(249,115,22,.15);color:var(--accent);">📦 ${escapeHtml(s.forfaitNom)}</span>`:''}</p>
         ${s.comment?`<p style="margin-top:5px;font-style:italic;font-size:.8rem;color:var(--muted)">${s.comment}</p>`:''}
       </div>
       <div class="no-print" style="margin-left:auto;display:flex;gap:7px;flex-wrap:wrap;">
@@ -2086,6 +2221,151 @@ function renderWeek(){
   document.getElementById('week-label').textContent=`Semaine du ${from} au ${to}`;
 }
 
+// ===== RÉGLAGES : forfaits prédéfinis + infos école =====
+
+// Ouvre la modale Réglages : charge la liste des forfaits + les infos de l'école.
+function openReglages(){
+  renderForfaitsList();
+  // Pré-remplit les champs école avec les valeurs persistées
+  document.getElementById('reglages-nom').value=reglages.nomEcole||'';
+  document.getElementById('reglages-tel').value=reglages.telephone||'';
+  document.getElementById('reglages-adresse').value=reglages.adresse||'';
+  openModal('reglages');
+}
+
+// Enregistre les infos générales de l'école (nom, téléphone, adresse).
+function saveReglagesEcole(){
+  reglages.nomEcole=document.getElementById('reglages-nom').value.trim();
+  reglages.telephone=document.getElementById('reglages-tel').value.trim();
+  reglages.adresse=document.getElementById('reglages-adresse').value.trim();
+  saveData();
+  showToast('Infos de l\'école enregistrées ✅');
+}
+
+// Affiche la liste des forfaits dans la modale Réglages (avec actions d'édition).
+// Un forfait désactivé apparaît grisé : il reste dans la liste mais n'est plus
+// proposé dans la modale "Nouvel élève" (utile pour retirer temporairement un forfait).
+function renderForfaitsList(){
+  const c=document.getElementById('forfaits-list');
+  if(!c)return;
+  if(!forfaits.length){
+    c.innerHTML='<p style="color:var(--muted);font-size:.82rem;text-align:center;padding:10px;">Aucun forfait. Cliquez sur "+ Nouveau forfait" pour commencer.</p>';
+    return;
+  }
+  c.innerHTML=forfaits.map(f=>{
+    const opacity=f.actif?'1':'.45';
+    const statut=f.actif?'':'<span class="tag" style="background:rgba(148,163,184,.15);color:var(--muted);font-size:.66rem;">Désactivé</span>';
+    return `<div class="forfait-row" style="border-left:4px solid ${f.couleur||'#f97316'};background:var(--surface);border-radius:8px;padding:10px 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;opacity:${opacity};">
+      <div style="flex:1;min-width:180px;">
+        <div style="font-weight:600;font-size:.88rem;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+          ${escapeHtml(f.nom)} ${permisBadge(f.permis)} ${statut}
+        </div>
+        <div style="font-size:.75rem;color:var(--muted);margin-top:3px;">
+          ${f.heures}h × ${fmtEuro(f.tarifHoraire)} = <strong style="color:var(--accent);">${fmtEuro(f.prixTotal)}</strong>
+          ${f.options?` · ${escapeHtml(f.options)}`:''}
+        </div>
+      </div>
+      <div style="display:flex;gap:5px;">
+        <button class="btn btn-ghost btn-sm" onclick="toggleForfaitActif(${f.id})" title="${f.actif?'Désactiver':'Activer'}">${f.actif?'🚫':'✅'}</button>
+        <button class="btn btn-ghost btn-sm" onclick="openForfaitForm(${f.id})" title="Modifier">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteForfait(${f.id})" title="Supprimer">🗑</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// Ouvre la modale de création/édition d'un forfait.
+// Si id fourni → pré-remplit avec les valeurs existantes (mode édition).
+// Sinon → formulaire vide pour créer (mode création).
+function openForfaitForm(id){
+  const isEdit=typeof id==='number';
+  document.getElementById('forfait-modal-title').textContent=isEdit?'✏️ Modifier le forfait':'📦 Nouveau forfait';
+  document.getElementById('forfait-id').value=isEdit?id:'';
+  if(isEdit){
+    const f=forfaits.find(x=>x.id===id);
+    if(!f){showToast('Forfait introuvable','error');return;}
+    document.getElementById('forfait-nom').value=f.nom||'';
+    document.getElementById('forfait-permis').value=f.permis||'A2';
+    document.getElementById('forfait-couleur').value=f.couleur||'#f97316';
+    document.getElementById('forfait-heures').value=f.heures||'';
+    document.getElementById('forfait-tarif').value=f.tarifHoraire||'';
+    document.getElementById('forfait-prix').value=f.prixTotal||'';
+    document.getElementById('forfait-options').value=f.options||'';
+    document.getElementById('forfait-actif').checked=f.actif!==false;
+  }else{
+    document.getElementById('forfait-nom').value='';
+    document.getElementById('forfait-permis').value='A2';
+    document.getElementById('forfait-couleur').value='#f97316';
+    document.getElementById('forfait-heures').value='';
+    document.getElementById('forfait-tarif').value='';
+    document.getElementById('forfait-prix').value='';
+    document.getElementById('forfait-options').value='';
+    document.getElementById('forfait-actif').checked=true;
+  }
+  openModal('forfait');
+}
+
+// Enregistre un forfait (création ou mise à jour selon la présence d'un id caché).
+function saveForfait(){
+  const nom=document.getElementById('forfait-nom').value.trim();
+  const heures=parseFloat(document.getElementById('forfait-heures').value);
+  const tarifHoraire=parseFloat(document.getElementById('forfait-tarif').value)||0;
+  const prixTotal=parseFloat(document.getElementById('forfait-prix').value)||0;
+  // Validation : nom obligatoire + heures > 0
+  if(!nom){showToast('Le nom est obligatoire','error');return;}
+  if(!heures||heures<=0){showToast('Les heures doivent être > 0','error');return;}
+  const data={
+    nom,
+    permis:document.getElementById('forfait-permis').value,
+    couleur:document.getElementById('forfait-couleur').value,
+    heures,
+    tarifHoraire,
+    // Si prix total non renseigné, on le calcule automatiquement
+    prixTotal:prixTotal||(heures*tarifHoraire),
+    options:document.getElementById('forfait-options').value.trim(),
+    actif:document.getElementById('forfait-actif').checked,
+  };
+  const idStr=document.getElementById('forfait-id').value;
+  if(idStr){
+    // Mode édition : on remplace les propriétés du forfait existant
+    const id=parseInt(idStr,10);
+    const f=forfaits.find(x=>x.id===id);
+    if(f){Object.assign(f,data);}
+  }else{
+    // Mode création : nouvel id + ajout en tête de liste (plus visible)
+    data.id=nouvelId('forfaits');
+    forfaits.unshift(data);
+  }
+  saveData();
+  closeModal('forfait');
+  renderForfaitsList();
+  showToast(idStr?'Forfait modifié ✅':'Forfait créé ✅');
+}
+
+// Supprime un forfait après confirmation.
+// Note : ne touche PAS aux élèves qui avaient choisi ce forfait (approche B :
+// les valeurs sont copiées au moment de l'inscription).
+function deleteForfait(id){
+  const f=forfaits.find(x=>x.id===id);
+  if(!f)return;
+  if(!confirm(`Supprimer le forfait "${f.nom}" ?\n\nLes élèves déjà inscrits ne sont pas impactés (leurs données sont figées).`))return;
+  forfaits=forfaits.filter(x=>x.id!==id);
+  saveData();
+  renderForfaitsList();
+  showToast('Forfait supprimé 🗑');
+}
+
+// Bascule le statut actif/désactivé d'un forfait (sans le supprimer).
+// Un forfait désactivé n'apparaît plus dans la modale "Nouvel élève".
+function toggleForfaitActif(id){
+  const f=forfaits.find(x=>x.id===id);
+  if(!f)return;
+  f.actif=!f.actif;
+  saveData();
+  renderForfaitsList();
+  showToast(f.actif?'Forfait activé ✅':'Forfait désactivé 🚫');
+}
+
 // ===== EVENTS CRUD =====
 function openModal(name){document.getElementById('modal-'+name).classList.add('open');}
 function closeModal(name){document.getElementById('modal-'+name).classList.remove('open');}
@@ -2492,6 +2772,34 @@ function permisBadge(p){
   return`<span class="permis-badge permis-${v}">${v}</span>`;
 }
 
+// Ouvre la modale "Nouvel élève" : remplit d'abord le sélecteur de forfaits
+// avec la liste des forfaits actifs, puis affiche la modale.
+function openAddStudentModal(){
+  const sel=document.getElementById('new-forfait');
+  if(sel){
+    // On conserve la première option "— Personnalisé —" et on ajoute les forfaits actifs
+    sel.innerHTML='<option value="">— Personnalisé (saisie manuelle) —</option>'+
+      forfaits.filter(f=>f.actif).map(f=>
+        `<option value="${f.id}">📦 ${escapeHtml(f.nom)} — ${f.heures}h · ${fmtEuro(f.prixTotal)}</option>`
+      ).join('');
+    sel.value=''; // Par défaut : personnalisé
+  }
+  openModal('add-student');
+}
+
+// Déclenché quand l'utilisateur choisit un forfait dans la modale "Nouvel élève".
+// Pré-remplit permis + tarif horaire. Les heures effectuées restent à 0 (c'est
+// un compteur de progression, pas le total du forfait).
+function applyForfaitToNewStudent(){
+  const id=parseInt(document.getElementById('new-forfait').value,10);
+  if(!id)return; // "Personnalisé" → on ne touche à rien
+  const f=forfaits.find(x=>x.id===id);
+  if(!f)return;
+  document.getElementById('new-permis').value=f.permis||'A2';
+  document.getElementById('new-tarif').value=f.tarifHoraire||50;
+  showToast(`Forfait "${f.nom}" appliqué ✨`);
+}
+
 function addStudent(){
   const fname=document.getElementById('new-fname').value.trim();
   const lname=document.getElementById('new-lname').value.trim();
@@ -2506,12 +2814,18 @@ function addStudent(){
   const tarifRaw=parseFloat(document.getElementById('new-tarif').value);
   const tarifHoraire=(isFinite(tarifRaw)&&tarifRaw>=0)?tarifRaw:50;
   const email=(document.getElementById('new-email').value||'').trim();
-  students.push({id:nouvelId('students'),fname,lname,phone:document.getElementById('new-phone').value||'—',email,hours:parseInt(document.getElementById('new-hours').value)||0,exam:document.getElementById('new-exam').value,permis,tarifHoraire,comment:'',moniteurId,skills:{Freinage:'Débutant',Virage:'Débutant',Maniabilité:'Débutant',Équilibre:'Débutant',Signalisation:'Débutant',Vitesse:'Débutant'},history:[]});
+  // On copie le nom du forfait sur l'élève (approche B : valeurs figées au moment
+  // de l'inscription). Si forfait supprimé/renommé plus tard → l'élève garde son libellé.
+  const forfaitId=parseInt(document.getElementById('new-forfait').value,10);
+  const forfaitChoisi=forfaitId?forfaits.find(x=>x.id===forfaitId):null;
+  const forfaitNom=forfaitChoisi?forfaitChoisi.nom:'';
+  students.push({id:nouvelId('students'),fname,lname,phone:document.getElementById('new-phone').value||'—',email,hours:parseInt(document.getElementById('new-hours').value)||0,exam:document.getElementById('new-exam').value,permis,tarifHoraire,forfaitNom,comment:'',moniteurId,skills:{Freinage:'Débutant',Virage:'Débutant',Maniabilité:'Débutant',Équilibre:'Débutant',Signalisation:'Débutant',Vitesse:'Débutant'},history:[]});
   saveData();closeModal('add-student');
   ['new-fname','new-lname','new-phone','new-email'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('new-hours').value=0;
   document.getElementById('new-permis').value='A2';
   document.getElementById('new-tarif').value=50;
+  document.getElementById('new-forfait').value='';
   showToast('Élève ajouté ✅');renderDashboard();
 }
 
